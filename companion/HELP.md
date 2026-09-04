@@ -91,10 +91,15 @@ connection is healthy.
 - **Video decoder is locked** — true while the decoder reports video lock.
 - **Any alarm is active** — red while the receiver's alarm bitfield reports at
   least one active condition.
-- **Channel power below threshold** — red when the chosen channel (or the
-  strongest of the four) drops below a configurable dBm threshold.
-- **Temperature above threshold** — red when the chosen sensor (unit, demod or
-  decoder FPGA) exceeds a configurable °C threshold.
+- **Channel power crosses threshold** — red when the chosen channel (or the
+  strongest of the four) crosses a configurable dBm threshold, in whichever
+  direction (below/above) you pick.
+- **Channel MER crosses threshold** — red when the chosen channel (or the
+  cleanest of the four) crosses a configurable dB threshold, in whichever
+  direction you pick.
+- **Temperature crosses threshold** — red when the chosen sensor (unit, demod
+  or decoder FPGA) crosses a configurable °C threshold, in whichever direction
+  you pick.
 
 ## Behaviour when the receiver is unreachable
 

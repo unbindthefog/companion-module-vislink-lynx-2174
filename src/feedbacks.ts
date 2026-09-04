@@ -1,6 +1,22 @@
 import type ModuleInstance from './main.js'
 import { CHANNEL_IDS } from './types.js'
 
+/** Which side of the threshold counts as an alarm. Shared by every threshold feedback. */
+type ThresholdDirection = 'below' | 'above'
+
+const DIRECTION_CHOICES: { id: ThresholdDirection; label: string }[] = [
+	{ id: 'below', label: 'Below' },
+	{ id: 'above', label: 'Above' },
+]
+
+/** True when `value` is on the alarm side of `threshold`, given `direction`. */
+function crossesThreshold(value: number | undefined, threshold: number, direction: ThresholdDirection): boolean {
+	// No reading means no alarm: an unlocked receiver already has its own
+	// feedback, and firing both would double-report one fault.
+	if (typeof value !== 'number') return false
+	return direction === 'above' ? value > threshold : value < threshold
+}
+
 export type FeedbacksSchema = {
 	channel_locked: {
 		type: 'boolean'
@@ -14,13 +30,17 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: Record<string, never>
 	}
-	power_below: {
+	power_threshold: {
 		type: 'boolean'
-		options: { channel: string; threshold: number }
+		options: { channel: string; direction: ThresholdDirection; threshold: number }
 	}
-	temperature_above: {
+	mer_threshold: {
 		type: 'boolean'
-		options: { source: string; threshold: number }
+		options: { channel: string; direction: ThresholdDirection; threshold: number }
+	}
+	temperature_threshold: {
+		type: 'boolean'
+		options: { source: string; direction: ThresholdDirection; threshold: number }
 	}
 }
 
@@ -29,8 +49,9 @@ export const ALL_FEEDBACKS = [
 	'channel_locked',
 	'video_locked',
 	'alarm_active',
-	'power_below',
-	'temperature_above',
+	'power_threshold',
+	'mer_threshold',
+	'temperature_threshold',
 ] as const satisfies ReadonlyArray<keyof FeedbacksSchema>
 
 /** Red on a dark button — the house style for "something is wrong". */
@@ -74,11 +95,11 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			callback: () => self.state.alarmActive,
 		},
 
-		power_below: {
-			name: 'Channel power below threshold',
+		power_threshold: {
+			name: 'Channel power crosses threshold',
 			type: 'boolean',
 			description:
-				'Turns red when the chosen channel’s input power drops below the threshold. "Best channel" tracks the strongest input, which is what diversity reception actually delivers.',
+				'Turns red when the chosen channel’s input power crosses the threshold, in whichever direction counts as bad. "Best channel" tracks the strongest input, which is what diversity reception actually delivers.',
 			defaultStyle: ALARM_STYLE,
 			options: [
 				{
@@ -92,27 +113,72 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 					],
 				},
 				{
+					type: 'dropdown',
+					id: 'direction',
+					label: 'Alarm when power is',
+					default: 'below',
+					choices: DIRECTION_CHOICES,
+				},
+				{
 					type: 'number',
 					id: 'threshold',
-					label: 'Alarm below (dBm)',
+					label: 'Threshold (dBm)',
 					default: -60,
 					min: -150,
 					max: 10,
 				},
 			],
 			callback: (feedback) => {
-				const { channel, threshold } = feedback.options
+				const { channel, direction, threshold } = feedback.options
 				const power = channel === 'best' ? self.state.bestPower : self.state.channelPower[Number(channel)]
-				// No reading means no alarm: an unlocked receiver already has its
-				// own feedback, and firing both would double-report one fault.
-				return typeof power === 'number' && power < threshold
+				return crossesThreshold(power, threshold, direction)
 			},
 		},
 
-		temperature_above: {
-			name: 'Temperature above threshold',
+		mer_threshold: {
+			name: 'Channel MER crosses threshold',
 			type: 'boolean',
-			description: 'Turns red above the threshold on the chosen sensor.',
+			description:
+				'Turns red when the chosen channel’s modulation error ratio crosses the threshold, in whichever direction counts as bad. "Best channel" tracks the cleanest input.',
+			defaultStyle: ALARM_STYLE,
+			options: [
+				{
+					type: 'dropdown',
+					id: 'channel',
+					label: 'Channel',
+					default: 'best',
+					choices: [
+						{ id: 'best', label: 'Best channel' },
+						...CHANNEL_IDS.map((n) => ({ id: String(n), label: `Channel ${n}` })),
+					],
+				},
+				{
+					type: 'dropdown',
+					id: 'direction',
+					label: 'Alarm when MER is',
+					default: 'below',
+					choices: DIRECTION_CHOICES,
+				},
+				{
+					type: 'number',
+					id: 'threshold',
+					label: 'Threshold (dB)',
+					default: 20,
+					min: -10,
+					max: 40,
+				},
+			],
+			callback: (feedback) => {
+				const { channel, direction, threshold } = feedback.options
+				const mer = channel === 'best' ? self.state.bestMer : self.state.channelMer[Number(channel)]
+				return crossesThreshold(mer, threshold, direction)
+			},
+		},
+
+		temperature_threshold: {
+			name: 'Temperature crosses threshold',
+			type: 'boolean',
+			description: 'Turns red when the chosen sensor crosses the threshold, in whichever direction counts as bad.',
 			defaultStyle: ALARM_STYLE,
 			options: [
 				{
@@ -127,23 +193,30 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 					],
 				},
 				{
+					type: 'dropdown',
+					id: 'direction',
+					label: 'Alarm when temperature is',
+					default: 'above',
+					choices: DIRECTION_CHOICES,
+				},
+				{
 					type: 'number',
 					id: 'threshold',
-					label: 'Alarm above (°C)',
+					label: 'Threshold (°C)',
 					default: 80,
 					min: 0,
 					max: 120,
 				},
 			],
 			callback: (feedback) => {
-				const { source, threshold } = feedback.options
+				const { source, direction, threshold } = feedback.options
 				const value =
 					source === 'demod'
 						? self.state.demodTemperature
 						: source === 'decoder'
 							? self.state.decoderTemperature
 							: self.state.unitTemperature
-				return typeof value === 'number' && value > threshold
+				return crossesThreshold(value, threshold, direction)
 			},
 		},
 	})

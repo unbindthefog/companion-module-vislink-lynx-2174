@@ -31,6 +31,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		channelLock: {} as Record<number, string | undefined>,
 		channelPower: {} as Record<number, number | undefined>,
 		bestPower: undefined as number | undefined,
+		channelMer: {} as Record<number, number | undefined>,
+		bestMer: undefined as number | undefined,
 		videoLocked: '',
 		alarmActive: false,
 		unitTemperature: undefined as number | undefined,
@@ -199,19 +201,27 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.state.decoderTemperature = toNumber(values.decoder_fpga_temperature)
 
 		const powers: number[] = []
+		const mers: number[] = []
 		for (const n of CHANNEL_IDS) {
 			this.state.channelLock[n] = values[`channel${n}_lock`]
 			const power = toNumber(values[`channel${n}_power`])
 			this.state.channelPower[n] = power
 			if (power !== undefined) powers.push(power)
+
+			const mer = toNumber(values[`channel${n}_mer`])
+			this.state.channelMer[n] = mer
+			if (mer !== undefined) mers.push(mer)
 		}
 		this.state.bestPower = powers.length ? Math.max(...powers) : undefined
+		this.state.bestMer = mers.length ? Math.max(...mers) : undefined
 	}
 
 	#clearState(): void {
 		this.state.channelLock = {}
 		this.state.channelPower = {}
 		this.state.bestPower = undefined
+		this.state.channelMer = {}
+		this.state.bestMer = undefined
 		this.state.videoLocked = ''
 		this.state.alarmActive = false
 		this.state.unitTemperature = undefined
