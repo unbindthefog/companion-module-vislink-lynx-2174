@@ -59,9 +59,15 @@ export const ALL_FEEDBACKS = [
 	'voltage_threshold',
 ] as const satisfies ReadonlyArray<keyof FeedbacksSchema>
 
-/** Red on a dark button — the house style for "something is wrong". */
-const ALARM_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
-const OK_STYLE = { bgcolor: 0x00c000, color: 0x000000 }
+/**
+ * The house styles for "something is wrong" / "all good" / "watch this".
+ * Exported so presets dress their buttons in the same colours the feedbacks
+ * apply, rather than each file inventing its own greens and reds.
+ */
+export const ALARM_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
+export const OK_STYLE = { bgcolor: 0x00c000, color: 0x000000 }
+export const WARNING_STYLE = { bgcolor: 0xff8000, color: 0x000000 }
+export const READOUT_STYLE = { bgcolor: 0x000000, color: 0xffffff }
 
 export function UpdateFeedbacks(self: ModuleInstance): void {
 	self.setFeedbackDefinitions({

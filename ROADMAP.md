@@ -15,11 +15,11 @@ against that same receiver (all 39 variables populate correctly; see the
 - [x] Parameter reference with Klartext labels/ranges (`docs/LYNX_L2174_API.md`)
 - [x] Minimal HTTP client + `data.xml` parser (`src/api.ts`)
 - [x] Variables: unit info, RF/demod status, per-channel lock/power/MER, decoder, alarms
-- [x] Feedbacks: channel lock, video lock, alarm active, power/MER/temperature
-      threshold (each with a below/above direction, not baked into the name),
-      camera battery voltage zone (fixed green/orange/red bands)
+- [x] Feedbacks: channel lock, video lock, alarm active, and
+      power/MER/temperature/voltage threshold — each with a below/above
+      direction rather than the comparison baked into the name
 - [x] Load the module into a real Companion instance and verify against the receiver
-- [ ] Presets: per-channel RF-lock button, alarm-summary readout
+- [x] Presets: 21 ready-made buttons in three sections (Signal / Decoder / Unit)
 
 ### Verified against real hardware (2026-09-04)
 
