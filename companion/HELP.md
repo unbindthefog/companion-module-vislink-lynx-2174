@@ -100,6 +100,10 @@ connection is healthy.
 - **Temperature crosses threshold** — red when the chosen sensor (unit, demod
   or decoder FPGA) crosses a configurable °C threshold, in whichever direction
   you pick.
+- **Camera battery voltage zone** — colours the button by fixed voltage zones
+  (green at/above 12.5V, orange down to 11.8V, red below that) instead of a
+  single alarm threshold. No options — the zones are fixed, not per-button
+  configurable.
 
 ## Behaviour when the receiver is unreachable
 

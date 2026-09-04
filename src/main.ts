@@ -38,6 +38,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		unitTemperature: undefined as number | undefined,
 		demodTemperature: undefined as number | undefined,
 		decoderTemperature: undefined as number | undefined,
+		cameraBatteryVoltage: undefined as number | undefined,
 	}
 
 	#api: LynxApi | null = null
@@ -199,6 +200,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.state.unitTemperature = toNumber(values.unit_temperature)
 		this.state.demodTemperature = toNumber(values.demod_fpga_temperature)
 		this.state.decoderTemperature = toNumber(values.decoder_fpga_temperature)
+		this.state.cameraBatteryVoltage = toNumber(values.camera_battery_voltage)
 
 		const powers: number[] = []
 		const mers: number[] = []
@@ -227,6 +229,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.state.unitTemperature = undefined
 		this.state.demodTemperature = undefined
 		this.state.decoderTemperature = undefined
+		this.state.cameraBatteryVoltage = undefined
 	}
 
 	/** Record an error, logging only when it changes so polling can't spam the log. */

@@ -42,6 +42,10 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: { source: string; direction: ThresholdDirection; threshold: number }
 	}
+	voltage_zone: {
+		type: 'advanced'
+		options: Record<string, never>
+	}
 }
 
 /** Every feedback id, so a poll can re-evaluate the lot without listing them twice. */
@@ -52,11 +56,20 @@ export const ALL_FEEDBACKS = [
 	'power_threshold',
 	'mer_threshold',
 	'temperature_threshold',
+	'voltage_zone',
 ] as const satisfies ReadonlyArray<keyof FeedbacksSchema>
 
 /** Red on a dark button — the house style for "something is wrong". */
 const ALARM_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
 const OK_STYLE = { bgcolor: 0x00c000, color: 0x000000 }
+const WARNING_STYLE = { bgcolor: 0xff8000, color: 0x000000 }
+
+/**
+ * Fixed voltage zones for the camera battery, agreed with the operator rather
+ * than left user-configurable: below `LOW` is a hard alarm, at or above `OK`
+ * is healthy, and the band between is an early warning.
+ */
+const CAMERA_BATTERY_VOLTAGE_ZONES = { ok: 12.5, low: 11.8 }
 
 export function UpdateFeedbacks(self: ModuleInstance): void {
 	self.setFeedbackDefinitions({
@@ -217,6 +230,20 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 							? self.state.decoderTemperature
 							: self.state.unitTemperature
 				return crossesThreshold(value, threshold, direction)
+			},
+		},
+
+		voltage_zone: {
+			name: 'Camera battery voltage zone',
+			type: 'advanced',
+			description: `Colours the button by fixed voltage zones: green at or above ${CAMERA_BATTERY_VOLTAGE_ZONES.ok}V, orange down to ${CAMERA_BATTERY_VOLTAGE_ZONES.low}V, red below that. Zones are fixed, not configurable per button.`,
+			options: [],
+			callback: () => {
+				const voltage = self.state.cameraBatteryVoltage
+				if (typeof voltage !== 'number') return {}
+				if (voltage >= CAMERA_BATTERY_VOLTAGE_ZONES.ok) return OK_STYLE
+				if (voltage >= CAMERA_BATTERY_VOLTAGE_ZONES.low) return WARNING_STYLE
+				return ALARM_STYLE
 			},
 		},
 	})
