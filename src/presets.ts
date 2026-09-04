@@ -28,9 +28,11 @@ function monitorPreset(preset: Omit<NonNullable<Presets[string]>, 'type' | 'step
  * Input power zones, in dBm. Unlike MER this is a window: the front end
  * overloads near 0 dBm, so a level that is too high loses lock just like one
  * that is too low. Preset defaults only — every button keeps its own editable
- * thresholds. The low end is set near where this class of receiver runs out
- * of signal; the high end is a guess, since the compression point of the front
- * end is not published in the receiver's own data — see ROADMAP.md.
+ * thresholds. The low end (-70 warning, -80 alarm) is a settled choice: the
+ * product manual gives -93 dBm sensitivity for DVB-T QPSK 1/2, and 16QAM 2/3
+ * needs roughly 8-10 dB more C/N, so the real cliff sits just below the alarm.
+ * The high end is still a guess — the manual's only upper figure is a 2 W CW
+ * damage level, not a compression point. See ROADMAP.md.
  */
 const POWER_ZONES = { highAlarm: -1, highWarning: -6, lowWarning: -70, lowAlarm: -80 }
 
