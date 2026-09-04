@@ -73,9 +73,11 @@ Open questions:
 ### Measure the usable input-power window (lab)
 
 The power preset alarms above −1 dBm on the assumption that the front end is
-compressing by then, but that number is a guess: the receiver's own data gives
-only the meter's range (−150 to +10 dBm), which says what the meter can read,
-not where the input starts to compress or take damage. Worth establishing on a
+compressing by then, but that number is a guess — and a researched one: no
+manufacturer in this class publishes a compression point or AGC window, and the
+manual's only upper figure is a 2 W CW damage level. See `docs/RF_LEVELS.md`
+for the full workings, including why the downconverter is not the limiting
+stage here. Worth establishing on a
 lab unit with a step attenuator — sweep the level while watching MER and lock,
 and note where MER starts to fall off at the top end. Then set the preset
 defaults from measurements instead of assumption.
