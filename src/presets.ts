@@ -24,6 +24,13 @@ function monitorPreset(preset: Omit<NonNullable<Presets[string]>, 'type' | 'step
 	return { type: 'simple', steps: [{ down: [], up: [] }], ...preset }
 }
 
+/**
+ * MER zones for the per-channel traffic light: above `warning` the link has
+ * margin, below `alarm` it is close to dropping out. Preset defaults only —
+ * every button keeps its own editable threshold.
+ */
+const MER_ZONES = { warning: 22, alarm: 16 }
+
 const TEMPERATURE_SENSORS = [
 	{ id: 'unit', caption: 'TEMP UNIT', variable: 'unit_temperature' },
 	{ id: 'demod', caption: 'TEMP DEMOD', variable: 'demod_fpga_temperature' },
@@ -56,15 +63,25 @@ export function UpdatePresets(self: ModuleInstance): void {
 			],
 		})
 
+		// Traffic light, same shape as the camera battery: healthy is green, and
+		// the two thresholds paint over it as the link degrades. Warning first,
+		// alarm second, so the lower threshold wins once both apply.
 		presets[`channel_${n}_mer`] = monitorPreset({
-			name: `Channel ${n} — MER`,
+			name: `Channel ${n} — MER (traffic light)`,
 			keywords: ['mer', 'quality', 'snr', 'channel', `${n}`],
-			style: { ...READOUT_STYLE, text: readout(`RF${n} MER`, `channel${n}_mer`), size: '14' },
+			style: { ...OK_STYLE, text: readout(`RF${n} MER`, `channel${n}_mer`), size: '14' },
 			feedbacks: [
 				{
 					feedbackId: 'mer_threshold',
-					options: { channel: String(n), direction: 'below', threshold: 20 },
+					options: { channel: String(n), direction: 'below', threshold: MER_ZONES.warning },
+					style: WARNING_STYLE,
+					headline: 'Marginal',
+				},
+				{
+					feedbackId: 'mer_threshold',
+					options: { channel: String(n), direction: 'below', threshold: MER_ZONES.alarm },
 					style: ALARM_STYLE,
+					headline: 'About to drop out',
 				},
 			],
 		})
