@@ -51,6 +51,14 @@ once the basics are proven:
 - ASI/IP routing state (`DB_DEMOD_ASI*_OUTPUT_MUX`, `DB_DEMOD_IP1_OUTPUT_MUX`)
 - Self-test bitfield (`DB_DEMOD_SELFTEST_RESULTS`), decoded the same way as alarms
 - LNB current per channel (`DB_DEMOD_CURRENT_1..4`)
+- Genlock — the L2174 calls it "Frame Lock" and exposes far less than the
+  RXD4's `genlock` module (no reference format, no per-output buffer delays):
+  `DB_DECOD_GEN_LOCK` (`Off`/`SD`/`HD`, the setting), `DB_DECOD_GEN_LOCK_ERROR`
+  (`OK`/`Fail`, the state worth alarming on), `DB_DECOD_PCR_LOCK`,
+  `DB_DECOD_LINE_OFFSET` (pixel offset) and `DB_DECOD_PSF_MODE`. Deferred to
+  the lab setup on purpose: on the production unit, PCR lock read `No Lock`
+  while frame lock reported `OK` on the `SD` reference, so the interplay
+  between the two needs a unit we can reconfigure before mapping it.
 
 Open questions:
 
