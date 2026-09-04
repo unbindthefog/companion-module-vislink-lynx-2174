@@ -70,6 +70,16 @@ Open questions:
   build — confirm the padding behaviour described in the API doc holds across
   more than the one firmware version this was explored on (`V1039`).
 
+### Measure the usable input-power window (lab)
+
+The power preset alarms above −1 dBm on the assumption that the front end is
+compressing by then, but that number is a guess: the receiver's own data gives
+only the meter's range (−150 to +10 dBm), which says what the meter can read,
+not where the input starts to compress or take damage. Worth establishing on a
+lab unit with a step attenuator — sweep the level while watching MER and lock,
+and note where MER starts to fall off at the top end. Then set the preset
+defaults from measurements instead of assumption.
+
 ## Later — actions (requires a lab receiver)
 
 **Not to be developed against production hardware.** The write path is

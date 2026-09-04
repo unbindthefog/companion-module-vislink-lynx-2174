@@ -118,24 +118,30 @@ voltage crosses threshold**:
 Below 11.8 V both match, and the red one wins because it is listed second.
 
 The MER presets ship this pattern already: green above 22 dB, orange down to
-16 dB, red below that. The same shape works for power and temperature.
+16 dB, red below that.
+
+Input power gets the same treatment, but as a **window** rather than a floor —
+too much signal overloads the receiver's front end and costs you lock just as
+surely as too little. Its preset stacks four feedbacks: green from −3 to
+−70 dBm, orange from −70 to −80 and from −3 to −1, red below −80 and above −1.
 
 ## Presets
 
 The module ships 21 ready-made buttons, grouped in three sections you can drag
 straight onto a page:
 
-| Section     | Buttons                                                                  |
-| ----------- | ------------------------------------------------------------------------ |
-| **Signal**  | RF lock, input power, and MER as a traffic light — one per channel (1–4) |
-| **Decoder** | Video lock, detected video format, audio 1 + 2 lock                      |
-| **Unit**    | Alarm status, camera battery, the three temperatures, and unit identity  |
+| Section     | Buttons                                                                      |
+| ----------- | ---------------------------------------------------------------------------- |
+| **Signal**  | RF lock plus power and MER as traffic lights — one of each per channel (1–4) |
+| **Decoder** | Video lock, detected video format, audio 1 + 2 lock                          |
+| **Unit**    | Alarm status, camera battery, the three temperatures, and unit identity      |
 
 Lock buttons start red and turn green once the receiver reports lock, so a
-healthy rack reads green at a glance. The MER and camera battery presets are
-traffic lights — green, then orange, then red as the reading degrades. The
-remaining readouts start neutral and only colour themselves once their single
-threshold is crossed.
+healthy rack reads green at a glance. The power, MER and camera battery
+presets are traffic lights — green, then orange, then red as the reading
+degrades, with power alarming at both ends of its window. The remaining
+readouts start neutral and only colour themselves once their single threshold
+is crossed.
 
 Presets are a starting point — thresholds, colours and text are all yours to
 edit once the button is on the page.

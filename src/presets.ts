@@ -25,6 +25,16 @@ function monitorPreset(preset: Omit<NonNullable<Presets[string]>, 'type' | 'step
 }
 
 /**
+ * Input power zones, in dBm. Unlike MER this is a window: the front end
+ * overloads near 0 dBm, so a level that is too high loses lock just like one
+ * that is too low. Preset defaults only — every button keeps its own editable
+ * thresholds. The low end is set near where this class of receiver runs out
+ * of signal; the high end is a guess, since the compression point of the front
+ * end is not published in the receiver's own data — see ROADMAP.md.
+ */
+const POWER_ZONES = { highAlarm: -1, highWarning: -3, lowWarning: -70, lowAlarm: -80 }
+
+/**
  * MER zones for the per-channel traffic light: above `warning` the link has
  * margin, below `alarm` it is close to dropping out. Preset defaults only —
  * every button keeps its own editable threshold.
@@ -50,15 +60,38 @@ export function UpdatePresets(self: ModuleInstance): void {
 			feedbacks: [{ feedbackId: 'channel_locked', options: { channel: n }, style: OK_STYLE }],
 		})
 
+		// Input power fails at both ends: too little signal and the demodulator
+		// starves, too much and the front end compresses, which kills lock just
+		// as thoroughly. So this traffic light is a window rather than a floor —
+		// four feedbacks, loosest first, because the last match wins.
 		presets[`channel_${n}_power`] = monitorPreset({
-			name: `Channel ${n} — input power`,
-			keywords: ['rf', 'power', 'level', 'dbm', 'channel', `${n}`],
-			style: { ...READOUT_STYLE, text: readout(`RF${n} PWR`, `channel${n}_power`), size: '14' },
+			name: `Channel ${n} — input power (traffic light)`,
+			keywords: ['rf', 'power', 'level', 'dbm', 'overload', 'channel', `${n}`],
+			style: { ...OK_STYLE, text: readout(`RF${n} PWR`, `channel${n}_power`), size: '14' },
 			feedbacks: [
 				{
 					feedbackId: 'power_threshold',
-					options: { channel: String(n), direction: 'below', threshold: -60 },
+					options: { channel: String(n), direction: 'below', threshold: POWER_ZONES.lowWarning },
+					style: WARNING_STYLE,
+					headline: 'Getting weak',
+				},
+				{
+					feedbackId: 'power_threshold',
+					options: { channel: String(n), direction: 'below', threshold: POWER_ZONES.lowAlarm },
 					style: ALARM_STYLE,
+					headline: 'Too little signal',
+				},
+				{
+					feedbackId: 'power_threshold',
+					options: { channel: String(n), direction: 'above', threshold: POWER_ZONES.highWarning },
+					style: WARNING_STYLE,
+					headline: 'Getting hot',
+				},
+				{
+					feedbackId: 'power_threshold',
+					options: { channel: String(n), direction: 'above', threshold: POWER_ZONES.highAlarm },
+					style: ALARM_STYLE,
+					headline: 'Overloading the input',
 				},
 			],
 		})
