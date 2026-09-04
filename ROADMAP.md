@@ -6,17 +6,36 @@ This is the initial skeleton: repo, build tooling, and a first cut of the
 read-only monitoring path, modelled on
 [`companion-module-domo-rxd4`](https://github.com/unbindthefog/companion-module-domo-rxd4).
 The parameter names and values it maps were confirmed against a live,
-production L2174 via read-only `curl` (see `docs/LYNX_L2174_API.md`) — the
-module code itself has **not yet been run inside Companion against that
-device**.
+production L2174 via read-only `curl` (see `docs/LYNX_L2174_API.md`), and the
+module has since been loaded into a real Companion instance and verified live
+against that same receiver (all 39 variables populate correctly; see the
+"Verified against real hardware" note below).
 
 - [x] `data.xml` reverse-engineered read-only against a production receiver
 - [x] Parameter reference with Klartext labels/ranges (`docs/LYNX_L2174_API.md`)
 - [x] Minimal HTTP client + `data.xml` parser (`src/api.ts`)
 - [x] Variables: unit info, RF/demod status, per-channel lock/power/MER, decoder, alarms
 - [x] Feedbacks: channel lock, video lock, alarm active, power threshold, temperature threshold
-- [ ] Load the module into a real Companion instance and verify against the receiver
+- [x] Load the module into a real Companion instance and verify against the receiver
 - [ ] Presets: per-channel RF-lock button, alarm-summary readout
+
+### Verified against real hardware (2026-09-04)
+
+Loaded via Companion's developer-modules path against a production L2174
+(`10.81.5.131`, Web ID "K7", build V1039). All 39 variables came through with
+live values (channel lock/power/MER, temperatures, BER, alarms); connection
+status green, no errors logged.
+
+One environment issue surfaced and was resolved along the way, unrelated to
+this module's code — noted here in case it recurs for other dev modules:
+Companion 5.0.3 failed to fully initialize _any_ dev module (this one and
+`companion-module-domo-rxd4` both hit an immediate `Error: Restart forced`
+crash loop). Updating to Companion 5.0.5 fixed it. Separately,
+`dev_modules_path` should point at a small dedicated folder of symlinks (e.g.
+`~/companion-dev-modules`), not at a large shared directory containing
+unrelated projects — pointing it at the latter made Companion's file watcher
+recurse into every sibling project's `node_modules`, which produced
+`EMFILE: too many open files` and a spurious self-referential symlink.
 
 ## Next — more monitoring depth
 
