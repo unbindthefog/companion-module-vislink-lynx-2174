@@ -122,8 +122,8 @@ The MER presets ship this pattern already: green above 22 dB, orange down to
 
 Input power gets the same treatment, but as a **window** rather than a floor —
 too much signal overloads the receiver's front end and costs you lock just as
-surely as too little. Its preset stacks four feedbacks: green from −3 to
-−70 dBm, orange from −70 to −80 and from −3 to −1, red below −80 and above −1.
+surely as too little. Its preset stacks four feedbacks: green from −6 to
+−70 dBm, orange from −70 to −80 and from −6 to −1, red below −80 and above −1.
 
 ## Presets
 

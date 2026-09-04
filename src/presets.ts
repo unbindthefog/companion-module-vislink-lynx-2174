@@ -32,7 +32,7 @@ function monitorPreset(preset: Omit<NonNullable<Presets[string]>, 'type' | 'step
  * of signal; the high end is a guess, since the compression point of the front
  * end is not published in the receiver's own data — see ROADMAP.md.
  */
-const POWER_ZONES = { highAlarm: -1, highWarning: -3, lowWarning: -70, lowAlarm: -80 }
+const POWER_ZONES = { highAlarm: -1, highWarning: -6, lowWarning: -70, lowAlarm: -80 }
 
 /**
  * MER zones for the per-channel traffic light: above `warning` the link has
