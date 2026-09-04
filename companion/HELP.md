@@ -100,10 +100,22 @@ connection is healthy.
 - **Temperature crosses threshold** — red when the chosen sensor (unit, demod
   or decoder FPGA) crosses a configurable °C threshold, in whichever direction
   you pick.
-- **Camera battery voltage zone** — colours the button by fixed voltage zones
-  (green at/above 12.5V, orange down to 11.8V, red below that) instead of a
-  single alarm threshold. No options — the zones are fixed, not per-button
-  configurable.
+- **Camera battery voltage crosses threshold** — red when the camera supply
+  voltage crosses a configurable V threshold, in whichever direction you pick.
+
+### Building a traffic-light button
+
+Companion applies boolean feedbacks in order, so the last matching one wins.
+For a green/orange/red battery readout, give the button a green base style and
+add two instances of **Camera battery voltage crosses threshold**:
+
+| Order | Threshold | Style  | Shows              |
+| ----- | --------- | ------ | ------------------ |
+| 1st   | 12.5 V    | orange | getting low        |
+| 2nd   | 11.8 V    | red    | change the battery |
+
+Below 11.8 V both match, and the red one wins because it is listed second.
+The same pattern works for power, MER and temperature.
 
 ## Behaviour when the receiver is unreachable
 
