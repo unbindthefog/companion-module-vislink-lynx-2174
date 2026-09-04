@@ -106,8 +106,9 @@ connection is healthy.
 ### Building a traffic-light button
 
 Companion applies boolean feedbacks in order, so the last matching one wins.
-For a green/orange/red battery readout, give the button a green base style and
-add two instances of **Camera battery voltage crosses threshold**:
+For a green/orange/red readout, give the button a green base style and stack
+two threshold feedbacks — for the battery, two instances of **Camera battery
+voltage crosses threshold**:
 
 | Order | Threshold | Style  | Shows              |
 | ----- | --------- | ------ | ------------------ |
@@ -115,23 +116,26 @@ add two instances of **Camera battery voltage crosses threshold**:
 | 2nd   | 11.8 V    | red    | change the battery |
 
 Below 11.8 V both match, and the red one wins because it is listed second.
-The same pattern works for power, MER and temperature.
+
+The MER presets ship this pattern already: green above 22 dB, orange down to
+16 dB, red below that. The same shape works for power and temperature.
 
 ## Presets
 
 The module ships 21 ready-made buttons, grouped in three sections you can drag
 straight onto a page:
 
-| Section     | Buttons                                                                 |
-| ----------- | ----------------------------------------------------------------------- |
-| **Signal**  | RF lock, input power and MER — one of each per channel (1–4)            |
-| **Decoder** | Video lock, detected video format, audio 1 + 2 lock                     |
-| **Unit**    | Alarm status, camera battery, the three temperatures, and unit identity |
+| Section     | Buttons                                                                  |
+| ----------- | ------------------------------------------------------------------------ |
+| **Signal**  | RF lock, input power, and MER as a traffic light — one per channel (1–4) |
+| **Decoder** | Video lock, detected video format, audio 1 + 2 lock                      |
+| **Unit**    | Alarm status, camera battery, the three temperatures, and unit identity  |
 
 Lock buttons start red and turn green once the receiver reports lock, so a
-healthy rack reads green at a glance. The readouts start neutral and colour
-themselves when a threshold is crossed. The camera battery preset comes with
-the two-feedback traffic light described above already wired up.
+healthy rack reads green at a glance. The MER and camera battery presets are
+traffic lights — green, then orange, then red as the reading degrades. The
+remaining readouts start neutral and only colour themselves once their single
+threshold is crossed.
 
 Presets are a starting point — thresholds, colours and text are all yours to
 edit once the button is on the page.
