@@ -129,7 +129,25 @@ export class LynxApi {
 
 		this.#pending++
 		try {
-			return await new Promise<string>((resolve, reject) => {
+			return await new Promise<string>((resolveRaw, rejectRaw) => {
+				// `req.setTimeout` below is a *socket* timeout: it only starts once the
+				// agent hands this request a socket. With maxSockets: 1 a request can
+				// instead sit in the agent's queue — which is exactly what happened in
+				// testing when the agent was reset mid-flight, leaving a poll that never
+				// settled and a poll loop that silently stopped for good. This watchdog
+				// does not care whether a socket was ever assigned.
+				// Held in an object because the settle helpers below close over it
+				// before the timer itself can be created — the timer needs `req`.
+				const watchdog: { timer?: NodeJS.Timeout } = {}
+				const resolve = (value: string) => {
+					clearTimeout(watchdog.timer)
+					resolveRaw(value)
+				}
+				const reject = (error: Error) => {
+					clearTimeout(watchdog.timer)
+					rejectRaw(error)
+				}
+
 				const req = http.request(
 					{
 						host,
@@ -162,6 +180,15 @@ export class LynxApi {
 					req.destroy(new Error(`Request timed out after ${timeoutMs} ms (${path})`))
 				})
 				req.on('error', reject)
+
+				watchdog.timer = setTimeout(() => {
+					req.destroy(new Error(`Request gave up after ${timeoutMs} ms without a socket (${path})`))
+					// If the request never got a socket, destroying it emits nothing, so
+					// settle here rather than trusting the error event to arrive.
+					reject(new Error(`Request timed out after ${timeoutMs} ms (${path})`))
+				}, timeoutMs)
+				watchdog.timer.unref?.()
+
 				req.end()
 			})
 		} catch (err) {
