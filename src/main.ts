@@ -21,6 +21,26 @@ export type ModuleSchema = {
 	variables: VariablesSchema
 }
 
+/** Longest we ever wait between polls while the receiver is unreachable. */
+const BACKOFF_MAX_MS = 30_000
+
+/**
+ * How long to wait before the next poll.
+ *
+ * A healthy connection polls at the configured interval. Once polls start
+ * failing the gap doubles each time, capped, so a receiver that is rebooting or
+ * already struggling is not knocked on every two seconds indefinitely. The
+ * first retry still comes at the normal interval, so a single dropped packet
+ * costs nothing in recovery time.
+ */
+export function pollDelayMs(baseMs: number, consecutiveFailures: number): number {
+	if (consecutiveFailures <= 0) return baseMs
+	// The cap never pulls the gap below what the user configured: someone who
+	// asked for a poll every 60 s does not want failures speeding that up.
+	const cap = Math.max(BACKOFF_MAX_MS, baseMs)
+	return Math.min(baseMs * 2 ** (consecutiveFailures - 1), cap)
+}
+
 export { UpgradeScripts }
 
 export default class ModuleInstance extends InstanceBase<ModuleSchema> {
@@ -44,6 +64,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	#api: LynxApi | null = null
 	#pollTimer: NodeJS.Timeout | undefined
 	#isPolling = false
+	/** Configured interval; the actual gap grows from here while polls fail. */
+	#pollIntervalMs = 2000
+	#consecutiveFailures = 0
 	#lastError = ''
 	#hasLoggedSuccess = false
 
@@ -118,25 +141,31 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		}
 
 		this.#hasLoggedSuccess = false
+		this.#pollIntervalMs = pollInterval
+		this.#consecutiveFailures = 0
 		this.updateStatus(InstanceStatus.Connecting)
 
+		// Each poll schedules the next one when it finishes, so a slow response
+		// delays the following request instead of stacking up behind it.
 		void this.#poll()
-		this.#startPolling(pollInterval)
 	}
 
-	#startPolling(intervalMs: number): void {
+	#scheduleNextPoll(): void {
 		this.#stopPolling()
-		this.#pollTimer = setInterval(() => {
-			// Never let polls overlap or queue up behind a slow response.
-			if (this.#isPolling) return
-			if (this.#api && this.#api.pending > 0) return
-			void this.#poll()
-		}, intervalMs)
+		// A poll already in flight when the instance is destroyed still runs its
+		// finally block; without this it would leave a timer behind.
+		if (!this.#api) return
+		this.#pollTimer = setTimeout(
+			() => {
+				void this.#poll()
+			},
+			pollDelayMs(this.#pollIntervalMs, this.#consecutiveFailures),
+		)
 	}
 
 	#stopPolling(): void {
 		if (this.#pollTimer) {
-			clearInterval(this.#pollTimer)
+			clearTimeout(this.#pollTimer)
 			this.#pollTimer = undefined
 		}
 	}
@@ -158,6 +187,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.setVariableValues(values)
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 
+			this.#consecutiveFailures = 0
 			this.#setError('')
 			this.updateStatus(InstanceStatus.Ok)
 
@@ -177,10 +207,19 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.setVariableValues(blankVariableValues())
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 
+			this.#consecutiveFailures++
+			const retryInMs = pollDelayMs(this.#pollIntervalMs, this.#consecutiveFailures)
+
+			// The log line dedupes on the message, so keep the countdown out of
+			// it and show it in the status instead, where it can change freely.
 			this.#setError(message)
-			this.updateStatus(InstanceStatus.ConnectionFailure, message)
+			this.updateStatus(InstanceStatus.ConnectionFailure, `${message} — retrying in ${Math.round(retryInMs / 1000)}s`)
+			if (retryInMs > this.#pollIntervalMs) {
+				this.log('debug', `Backing off after ${this.#consecutiveFailures} failed polls: next try in ${retryInMs} ms`)
+			}
 		} finally {
 			this.#isPolling = false
+			this.#scheduleNextPoll()
 		}
 	}
 

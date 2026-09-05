@@ -146,6 +146,36 @@ is crossed.
 Presets are a starting point — thresholds, colours and text are all yours to
 edit once the button is on the page.
 
+## Polling and load on the receiver
+
+The receiver writes `/data.xml` on its own one-second timer whether anyone
+reads it or not, and `lighttpd` then serves it as a plain static file — asking
+for it does **not** make the receiver gather anything. A poll costs it a socket
+it already has open, a `stat()` and 26 kB: measured at about 11 ms per request,
+with no degradation over repeated requests. At the default two-second interval
+that is roughly half a percent of the web server's time; the receiver's own web
+interface polls harder than we do, at 1 Hz.
+
+So a single connection is comfortably within what the device does for itself.
+Worth keeping in mind anyway on a 2011-vintage receiver:
+
+- **One connection per receiver.** Companion does not notice if you add the
+  same receiver twice, and two connections poll twice as often. If you need the
+  values on several pages, reference the one connection's variables from all of
+  them.
+- **Count the other readers too.** Every open browser tab of the receiver's own
+  web interface adds 1 Hz, and any dashboard or monitoring system polling the
+  same unit adds its own share. Raise the interval if several systems watch one
+  receiver.
+- **The module backs off on its own.** After a failed poll it retries at the
+  normal interval, then doubles the gap on each further failure up to 30
+  seconds, and returns to normal on the first success. A receiver that is
+  rebooting or already struggling is not knocked on every two seconds. The
+  connection status shows when the next attempt is due.
+
+Nothing this module sends changes device state: it only ever issues `GET` for a
+static file, so there is no configuration write and no flash wear involved.
+
 ## Behaviour when the receiver is unreachable
 
 The connection goes to _Connection Failure_ with an explanatory message, and
