@@ -22,6 +22,11 @@ function friendlyError(err: NodeJS.ErrnoException, host: string, path: string): 
 		case 'EHOSTUNREACH':
 		case 'ENETUNREACH':
 			return `Host unreachable (${host}) — check network/VLAN`
+		case 'EADDRINUSE':
+			// Seen for real: with the receiver unreachable overnight, retries piled
+			// up until the machine ran out of ephemeral ports. The backoff in
+			// main.ts is what stops that happening; this just names it clearly.
+			return `No local port free for ${host} — too many connection attempts are still open on this machine`
 		case 'EADDRNOTAVAIL':
 			return `No route to ${host} from this machine — check which network interface is active`
 		case 'ETIMEDOUT':
