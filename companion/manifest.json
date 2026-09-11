@@ -5,7 +5,7 @@
 	"name": "vislink-lynx-2174",
 	"shortname": "lynx2174",
 	"description": "Monitor Vislink Lynx L2174 RF broadcast receivers (RF lock, per-channel power/MER, decoder status, temperatures, alarms)",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"license": "MIT",
 	"repository": "git+https://github.com/unbindthefog/companion-module-vislink-lynx-2174.git",
 	"bugs": "https://github.com/unbindthefog/companion-module-vislink-lynx-2174/issues",
@@ -23,6 +23,17 @@
 	},
 	"legacyIds": [],
 	"manufacturer": "Vislink",
-	"products": ["Lynx L2174"],
-	"keywords": ["vislink", "lynx", "l2174", "receiver", "decoder", "rf", "broadcast", "cofdm"]
+	"products": [
+		"Lynx L2174"
+	],
+	"keywords": [
+		"vislink",
+		"lynx",
+		"l2174",
+		"receiver",
+		"decoder",
+		"rf",
+		"broadcast",
+		"cofdm"
+	]
 }
