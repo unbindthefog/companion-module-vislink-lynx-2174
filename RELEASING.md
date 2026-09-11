@@ -60,21 +60,42 @@ Our own bar:
 
 ## Release steps
 
+For a patch release, `yarn package` does the version bump itself — it raises the
+patch number in `package.json` and `companion/manifest.json` together, so the two
+cannot drift apart:
+
 ```bash
 git checkout main && git pull
-git checkout -b release/vX.Y.Z
-
-# bump "version" in package.json AND companion/manifest.json
 
 yarn format
-yarn package
+yarn package                    # build + bump + write the .tgz
 
 git commit -am "Release vX.Y.Z"
-git push -u origin release/vX.Y.Z
+git push
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-Once merged to `main` with CI green, create a GitHub Release with tag `vX.Y.Z`
-(this tags and generates release notes in one step), then submit the version in
-the Developer Portal: **My Connections** → this module → **Submit Version**.
+For a minor or major release, set the version in **both** files by hand first,
+then build without the bump:
+
+```bash
+yarn build && yarn companion-module-build
+```
+
+Pushing the tag runs the **Release** workflow, which builds the package on a
+clean checkout and attaches the `.tgz` to the GitHub release for that tag,
+creating the release if it does not exist yet. It first checks that the tag
+agrees with both version fields and fails the build on a mismatch, so a
+mislabelled package never reaches a release.
+
+That release asset is the file to hand to anyone who needs the module without a
+local build — it goes into Companion under **Modules → Import module package**.
+
+To get a current package _without_ cutting a release, run the same workflow by
+hand (**Actions → Release → Run workflow**) and download the `module-package`
+artifact from the run.
+
+Finally, submit the version in the Developer Portal: **My Connections** → this
+module → **Submit Version**.
 
 Bitfocus reviews the submission and publishes it to the store.

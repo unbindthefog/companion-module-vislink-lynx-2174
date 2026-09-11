@@ -1,0 +1,88 @@
+name: Release
+
+# Tagging vX.Y.Z builds the module package and attaches it to the GitHub
+# release for that tag, so every released version has a download that does not
+# depend on anyone's local checkout being built.
+#
+# Running this workflow by hand instead produces the same package as a workflow
+# artifact, for when you just want a current .tgz without cutting a release.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build module package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 22.x
+        # Match the runtime the manifest asks Companion for.
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      - name: Prepare environment
+        run: corepack enable
+
+      - name: Install
+        run: yarn install
+        env:
+          CI: true
+
+      - name: Check the version matches the tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          manifest=$(node -p "require('./companion/manifest.json').version")
+          echo "tag=$tag  package.json=$pkg  manifest=$manifest"
+          if [ "$tag" != "$pkg" ] || [ "$tag" != "$manifest" ]; then
+            echo "::error::Tag $tag disagrees with package.json ($pkg) or companion/manifest.json ($manifest). Bump both, then re-tag."
+            exit 1
+          fi
+
+      - name: Build
+        run: yarn build
+        env:
+          CI: true
+
+      - name: Package
+        # Deliberately not `yarn package`: that also runs tools/bump-version.mjs,
+        # which would raise the version above the tag being built.
+        run: yarn companion-module-build
+
+      - name: Locate the package
+        id: pkg
+        run: |
+          path=$(ls -1 *.tgz | head -1)
+          test -n "$path" || { echo "::error::No .tgz was produced"; exit 1; }
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "Built $path"
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "${{ steps.pkg.outputs.path }}" --clobber
+
+      - name: Upload as a workflow artifact
+        # Only for hand-run builds; a tagged build already has the release asset.
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: module-package
+          path: '*.tgz'
+          if-no-files-found: error
