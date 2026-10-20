@@ -15,7 +15,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			width: 12,
 			label: 'Vislink Lynx L2174',
 			value:
-				'Reads status from the receiver’s built-in data.xml. This module is read-only — it polls status and exposes it as variables and feedbacks, and never writes to the device.',
+				'Reads status from the receiver’s built-in data.xml and exposes it as variables and feedbacks. It also writes a short, fixed list of parameters for its actions — frequency, bandwidth, receive mode, decoder source, diversity and the display name. Nothing else can be written, whatever it is asked to do.',
 		},
 		{
 			type: 'textinput',
