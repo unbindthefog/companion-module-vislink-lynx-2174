@@ -1,10 +1,17 @@
 import type { CompanionPresetDefinitions, CompanionPresetSection } from '@companion-module/base'
 import type ModuleInstance from './main.js'
 import type { ModuleSchema } from './main.js'
-import { ALARM_STYLE, OK_STYLE, READOUT_STYLE, UNKNOWN_STYLE, WARNING_STYLE } from './feedbacks.js'
+import { ALARM_STYLE, DESTRUCTIVE_STYLE, OK_STYLE, READOUT_STYLE, UNKNOWN_STYLE, WARNING_STYLE } from './feedbacks.js'
 import { CHANNEL_IDS, type SettingId } from './types.js'
-import { BANDWIDTHS, DECODER_SOURCES, ON_OFF, RX_MODES } from './actions.js'
 import { guardedActionsEnabled } from './config.js'
+import {
+	CONTROL_CHANNELS,
+	CONTROL_SECTIONS,
+	CONTROL_SETTINGS,
+	type ControlSection,
+	type ControlSetting,
+	controlSettingId,
+} from './controls.js'
 
 type Presets = CompanionPresetDefinitions<ModuleSchema>
 type Sections = CompanionPresetSection<ModuleSchema>[]
@@ -28,6 +35,22 @@ function monitorPreset(preset: Omit<NonNullable<Presets[string]>, 'type' | 'step
 }
 
 type PresetAction = NonNullable<Presets[string]>['steps'][number]['down'][number]
+
+/**
+ * The action a control button carries.
+ *
+ * The cast is the seam between the table's plain strings and the schema's
+ * literal action and option ids. It is checked where it can be: `actions.ts`
+ * registers every row of the same table under that same `actionId` and reads
+ * that same `optionId`, so the pair cannot disagree without the action
+ * disappearing too.
+ */
+function controlPresetAction(setting: ControlSetting, channel: number | undefined, value: string): PresetAction {
+	const options = setting.perChannel
+		? { channel: String(channel), [setting.optionId]: value }
+		: { [setting.optionId]: value }
+	return { actionId: setting.actionId, options } as unknown as PresetAction
+}
 
 /**
  * A preset id built from a device value, e.g. 'LMST(S)' -> 'lmst_s'.
@@ -55,7 +78,7 @@ function controlPreset(args: {
 	keywords: string[]
 	caption: string
 	value: string
-	setting: SettingId
+	setting: SettingId | undefined
 	action: PresetAction
 }): NonNullable<Presets[string]> {
 	return {
@@ -67,12 +90,16 @@ function controlPreset(args: {
 		// than a small one — the value is the whole point of the button.
 		style: { ...READOUT_STYLE, text: `${args.caption}\n${args.value}`, size: args.value.length > 7 ? '7' : '14' },
 		feedbacks: [
-			{
-				feedbackId: 'setting_is',
-				options: { setting: args.setting, value: args.value },
-				style: OK_STYLE,
-				headline: 'Selected — green',
-			},
+			...(args.setting
+				? [
+						{
+							feedbackId: 'setting_is' as const,
+							options: { setting: args.setting, value: args.value },
+							style: OK_STYLE,
+							headline: 'Selected — green',
+						},
+					]
+				: []),
 			unknownCover('unit'),
 		],
 		steps: [{ down: [args.action], up: [] }],
@@ -277,52 +304,64 @@ export function UpdatePresets(self: ModuleInstance): void {
 	})
 
 	// ---- Control -------------------------------------------------------
-	// One button per value, built from the same lists the actions validate
-	// against. Each carries the matching `setting_is` feedback, so a wall of
-	// these reads at a glance as "this is the one we are on".
-
-	for (const mode of RX_MODES) {
-		presets[`set_mode_${slug(mode)}`] = controlPreset({
-			name: `Receive mode — ${mode}`,
-			keywords: ['mode', 'dvbt', 'lmst', 'receive'],
-			caption: 'MODE',
-			value: mode,
-			setting: 'mode',
-			action: { actionId: 'set_rx_mode', options: { mode } },
-		})
+	// One button per value, straight from CONTROL_SETTINGS — the same table the
+	// actions are built from, so a value can never appear on a button that the
+	// action would then refuse. Each carries the matching `setting_is` feedback,
+	// so a row of them reads at a glance as "this is the one we are on".
+	//
+	// Grouped per setting, and the groups collect into one section per area of
+	// the receiver. Collapsed in Companion's list that is a handful of rows; left
+	// in one flat section it was a wall.
+	const groups: Record<ControlSection, { id: string; type: 'simple'; name: string; presets: string[] }[]> = {
+		rf: [],
+		routing: [],
+		video: [],
+		unit: [],
 	}
 
-	for (const bandwidth of BANDWIDTHS) {
-		presets[`set_bandwidth_${slug(bandwidth)}`] = controlPreset({
-			name: `Channel bandwidth — ${bandwidth}`,
-			keywords: ['bandwidth', 'channel', 'mhz'],
-			caption: 'BW',
-			value: bandwidth,
-			setting: 'bandwidth',
-			action: { actionId: 'set_bandwidth', options: { bandwidth } },
-		})
+	/**
+	 * One group per setting — including the per-channel ones, whose four channels
+	 * share a single group rather than getting one each.
+	 *
+	 * Eight buttons under "Channel enable" is one glance; the same eight split
+	 * across four headings pushed the rest of the section off the screen and said
+	 * nothing the buttons do not already say. They carry the channel in their own
+	 * caption (RF1…RF4, LNB1…LNB4), so nothing is lost by dropping the headings.
+	 */
+	const addControl = (setting: ControlSetting) => {
+		const channels: (number | undefined)[] = setting.perChannel ? [...CONTROL_CHANNELS] : [undefined]
+		const ids: string[] = []
+
+		for (const channel of channels) {
+			const id = controlSettingId(setting, channel)
+			const caption = setting.caption.replace('{n}', String(channel))
+			const label = channel === undefined ? setting.label : `${setting.label} — channel ${channel}`
+
+			for (const value of setting.values) {
+				const presetId = `set_${id}_${slug(value)}`
+				ids.push(presetId)
+				presets[presetId] = controlPreset({
+					name: `${label} — ${value}`,
+					keywords: [...setting.keywords],
+					caption,
+					value,
+					// Nothing to match against when the receiver does not report it, so
+					// the button carries no green at all rather than a green that lies.
+					setting: setting.variable ? id : undefined,
+					action: controlPresetAction(setting, channel, value),
+				})
+			}
+		}
+
+		groups[setting.section].push({ id: `set_${setting.id}`, type: 'simple', name: setting.label, presets: ids })
 	}
 
-	for (const source of DECODER_SOURCES) {
-		presets[`set_source_${slug(source)}`] = controlPreset({
-			name: `Decoder source — ${source}`,
-			keywords: ['decoder', 'source', 'input', 'asi', 'routing'],
-			caption: 'SRC',
-			value: source,
-			setting: 'source',
-			action: { actionId: 'set_decoder_source', options: { source } },
-		})
-	}
-
-	for (const state of ON_OFF) {
-		presets[`set_diversity_${slug(state)}`] = controlPreset({
-			name: `Demodulator diversity — ${state}`,
-			keywords: ['diversity', 'demodulator'],
-			caption: 'DIV',
-			value: state,
-			setting: 'diversity',
-			action: { actionId: 'set_demod_diversity', options: { state } },
-		})
+	const guardedOn = guardedActionsEnabled(self)
+	for (const setting of CONTROL_SETTINGS) {
+		// A preset whose action the switch has removed would reach the button as
+		// "unknown action", so it is not offered either.
+		if (setting.guarded && !guardedOn) continue
+		addControl(setting)
 	}
 
 	// Frequency is a number, not a choice, so there is no sensible button per
@@ -358,6 +397,33 @@ export function UpdatePresets(self: ModuleInstance): void {
 			feedbacks: [unknownCover('unit')],
 			steps: [{ down: [{ actionId: 'recall_preset', options: { preset: slot } }], up: [] }],
 		}
+
+		// Store sits next to recall in the list and does the opposite: recall can
+		// be pressed again, store overwrites the slot and the old contents are
+		// gone. Two rows of sixteen buttons that differ only in a word is a
+		// mix-up nobody can undo, so these carry the destructive red — the
+		// difference is visible before the press, not spelled out after it.
+		presets[`store_preset_${slot}`] = {
+			type: 'simple',
+			name: `Store preset ${slot} (overwrites)`,
+			keywords: ['preset', 'store', 'save', 'overwrite', `${slot}`],
+			style: { ...DESTRUCTIVE_STYLE, text: `STORE\n${slot}`, size: '14' },
+			feedbacks: [unknownCover('unit')],
+			steps: [{ down: [{ actionId: 'store_preset', options: { preset: slot } }], up: [] }],
+		}
+	}
+
+	// One button, not sixteen: there is nothing to pick. Same red as store, for
+	// the same reason — a minute off air is not something to discover afterwards.
+	if (presetSlots.length) {
+		presets['reboot_receiver'] = {
+			type: 'simple',
+			name: 'Reboot receiver (off air ~1 min)',
+			keywords: ['reboot', 'restart', 'power'],
+			style: { ...DESTRUCTIVE_STYLE, text: 'REBOOT', size: '14' },
+			feedbacks: [unknownCover('unit')],
+			steps: [{ down: [{ actionId: 'reboot_receiver', options: {} }], up: [] }],
+		}
 	}
 
 	const sections: Sections = [
@@ -392,35 +458,18 @@ export function UpdatePresets(self: ModuleInstance): void {
 			name: 'Decoder',
 			definitions: ['video_lock', 'video_format', 'audio_lock'],
 		},
-		{
-			id: 'control',
-			name: 'Control',
-			description:
-				'Buttons that change the receiver. The ones that pick a value turn green while the receiver already holds it, so a row of them shows what is selected. Recall stays black: the receiver only reports which slot is selected, not which one is still in force. Recall appears at all only while the connection offers the interrupting actions.',
+		...(Object.keys(CONTROL_SECTIONS) as ControlSection[]).map((key) => ({
+			id: `control_${key}`,
+			name: CONTROL_SECTIONS[key].name,
+			description: CONTROL_SECTIONS[key].description,
 			definitions: [
-				{ id: 'set_mode', type: 'simple', name: 'Receive mode', presets: RX_MODES.map((m) => `set_mode_${slug(m)}`) },
-				{
-					id: 'set_bandwidth',
-					type: 'simple',
-					name: 'Channel bandwidth',
-					presets: BANDWIDTHS.map((b) => `set_bandwidth_${slug(b)}`),
-				},
-				{
-					id: 'set_source',
-					type: 'simple',
-					name: 'Decoder source',
-					presets: DECODER_SOURCES.map((d) => `set_source_${slug(d)}`),
-				},
-				{
-					id: 'set_diversity',
-					type: 'simple',
-					name: 'Demodulator diversity',
-					presets: ON_OFF.map((o) => `set_diversity_${slug(o)}`),
-				},
-				// A section's definitions have to be all groups or all plain names, so
-				// the single retune button travels as a group of one.
-				{ id: 'set_frequency', type: 'simple' as const, name: 'Retune', presets: ['set_frequency'] },
-				...(presetSlots.length
+				...groups[key],
+				// Retune and the preset buttons are not choices between fixed values,
+				// so they are not in the table — they join their section here.
+				...(key === 'rf'
+					? [{ id: 'set_frequency', type: 'simple' as const, name: 'Retune', presets: ['set_frequency'] }]
+					: []),
+				...(key === 'unit' && presetSlots.length
 					? [
 							{
 								id: 'recall_preset',
@@ -428,10 +477,17 @@ export function UpdatePresets(self: ModuleInstance): void {
 								name: 'Recall preset',
 								presets: presetSlots.map((n) => `recall_preset_${n}`),
 							},
+							{
+								id: 'store_preset',
+								type: 'simple' as const,
+								name: 'Store preset (overwrites)',
+								presets: presetSlots.map((n) => `store_preset_${n}`),
+							},
+							{ id: 'reboot_receiver', type: 'simple' as const, name: 'Reboot', presets: ['reboot_receiver'] },
 						]
 					: []),
 			],
-		},
+		})),
 		{
 			id: 'unit',
 			name: 'Unit',

@@ -173,10 +173,11 @@ Die 290 Parameter verteilen sich auf 8 sichtbare GUI-Tabs (Top-Nav `ROUTING…UN
 | -------------------- | -------------- | --------------------------------- | -------------------- |
 | `DB_L2174_FREQ1`     | Frequency      | 0.0068–10.00 GHz                  | `2.325000`           |
 | `DB_L2174_RX_MODE`   | Mode           | `DVBT`, `LMST(S)`, `LMST(D)`      | `LMST(S)`            |
-| `DB_L2174_CHAN_BW`   | Bandwidth      | `3MHz`…`12MHz` (8 Stufen)         | `10MHz`              |
+| `DB_DEMOD_RX_MODE`   | Mode (Messwert) | `None`, `DVB-T`, `LMST(S)`, `LMST(D)` | `DVB-T`         |
+| `DB_L2174_CHAN_BW`   | Bandwidth      | `2MHz`…`12MHz` (9 Stufen) + `Auto` | `10MHz`             |
 | `DB_DEMOD_MOD_TYPE`  | Mode           | `QPSK`, `16QAM`, `64QAM`          | `16QAM`              |
 | `DB_DEMOD_FEC_RATE`  | FEC Rate       | `1/2`, `2/3`, `3/4`, `5/6`, `7/8` | `2/3`                |
-| `DB_DEMOD_GUARD_INT` | Guard Interval | `1/16`, `1/8`, `Auto`             | `Auto`               |
+| `DB_DEMOD_GUARD_INT` | Guard Interval | `1/32`, `1/16`, `1/8`, `1/4`, `Auto` | `Auto`            |
 | `DB_DEMOD_SPEC_POL`  | Polarity       | `Normal`, `Inverted`, `Auto`      | `Normal`             |
 | `DB_DEMOD_TRIAX_EN`  | Triax Mode     | `Off`, `Single`, `Dual`           | `Off`                |
 | `DB_DEMOD_FEC_LOCK`  | FEC Lock       | `No Lock`, `Locked`               | `Locked`             |
@@ -630,3 +631,49 @@ Bemerkenswert: **L2174 ist die einzige der drei Plattformen mit eingebauter Selb
 **Gerät**: Vislink Lynx L2174 (IP: 10.81.5.131, Web-ID „K7“)
 **Firmware**: Unit Build V1039, Unit Sw Version 3.04, Kernel 1.05
 **Status**: Read-only untersucht & dokumentiert — **kein Schreibzugriff getestet** (Produktivgerät)
+
+
+---
+
+## 12. Nachtrag: schreibbare Parameter, am Laborgerät ausgezählt
+
+Frühere Abschnitte nennen 38/39 schreibbare Parameter. Diese Zahl stammt aus
+einem Blick auf einen Teil der GUI-Seiten und ist zu klein.
+
+Maßgeblich ist, welche Felder die GUI über `send_form(this, …)` bzw.
+`send_form_combo(this, …)` setzen — jedes solche Formular schreibt per
+`iframe.php`. Über alle 41 Seiten des Geräts ausgezählt (Laborgerät
+`10.81.5.149`, V1039, 20.10.2026):
+
+```bash
+# read-only: Seiten holen, Set-Formulare auszählen
+grep -ohE "send_form(_combo)?\(this, *'[^']*', *'DB_[A-Z0-9_]+'" *.html \
+  | grep -oE "DB_[A-Z0-9_]+" | sort -u | wc -l
+# -> 88
+```
+
+**88 schreibbare Parameter.** Nicht darunter, obwohl sie in `settings.xml` mit
+Optionsliste stehen: `DB_DEMOD_MOD_TYPE` und `DB_DEMOD_FEC_RATE` — der Receiver
+leitet beide aus dem TPS ab, sie sind Messwerte.
+
+### `settings.xml` taugt nicht als Schreibbarkeits-Quelle
+
+Dort haben auch reine Messwerte Optionslisten (`DB_DEMOD_COARSE_LOCK_1` →
+`No Lock`/`Locked`) und min/max (`DB_DEMOD_MER_1` → −10…40). Nach diesem
+Kriterium sähen 243 Parameter setzbar aus.
+
+### `enabled="yes|no"` ist dynamisch
+
+Das Attribut sagt, was **im aktuellen Zustand** wählbar ist, nicht was das Gerät
+kann. Beobachtet am selben Gerät innerhalb einer Stunde: im Modus LMST(S) waren
+bei `DB_L2174_CHAN_BW` nur `6MHz`/`7MHz`/`8MHz` freigegeben, während der
+Receiver selbst auf `10MHz` stand. Ein Client, der daraus seine Auswahlliste
+baut, muss sie also nach jeder Moduswahl neu holen — oder, wie dieses Modul, die
+vollen Wertemengen führen und sich auf das Zurücklesen verlassen.
+
+### Zwei Vokabulare für denselben Modus
+
+`DB_L2174_RX_MODE` (die Einstellung, schreibbar) kennt `DVBT`;
+`DB_DEMOD_RX_MODE` (der Messwert) schreibt denselben Modus als `DVB-T`. Wer
+einen gesetzten Wert gegenliest, muss denselben Parameter lesen, den er
+geschrieben hat.

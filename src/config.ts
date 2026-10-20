@@ -15,7 +15,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			width: 12,
 			label: 'Vislink Lynx L2174',
 			value:
-				'Reads status from the receiver’s built-in data.xml and exposes it as variables and feedbacks. It also writes a short, fixed list of parameters for its actions — frequency, bandwidth, receive mode, decoder source, diversity and the display name. Nothing else can be written, whatever it is asked to do.',
+				'Reads status from the receiver’s built-in data.xml and exposes it as variables and feedbacks. It also writes a fixed list of 35 parameters for its actions — reception, routing, video output and the status pin. Everything outside that list is refused, whatever it is asked to do: key material, licence entry, restoring defaults and the network configuration are never written.',
 		},
 		{
 			type: 'textinput',
@@ -48,14 +48,14 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			type: 'static-text',
 			id: 'guarded-info',
 			width: 12,
-			label: 'Interrupting actions',
+			label: 'Actions that interrupt, or put voltage on an input',
 			value:
-				'Recalling a preset reconfigures the receiver in one step; a reboot takes it off air for about a minute. Both are useful from a distance and both are the wrong thing to hit by accident, so they stay out of the action list until you switch them on here.',
+				'Four things stay out of the action list until you switch them on here. Recalling a preset reconfigures the receiver in one step and storing one overwrites the slot for good; a reboot takes it off air for about a minute. The fourth is different in kind: switching downconverter power puts DC on that antenna input, and whatever is on the far end of the coax gets it. All four are useful from a distance and all four are the wrong thing to hit by accident.',
 		},
 		{
 			type: 'checkbox',
 			id: 'allowGuardedActions',
-			label: 'Offer preset recall, preset store and reboot',
+			label: 'Offer preset recall and store, reboot, and downconverter power',
 			width: 12,
 			default: false,
 		},

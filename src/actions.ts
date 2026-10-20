@@ -1,56 +1,137 @@
 import type ModuleInstance from './main.js'
 import { guardedActionsEnabled } from './config.js'
+import { CONTROL_CHANNELS, CONTROL_SETTINGS, type ControlSetting, controlParameter } from './controls.js'
 
 /**
  * What this module will change on the receiver.
  *
- * The device exposes 39 writable parameters through its own web forms, and
- * every one of them is a plain `GET` with no authentication. That makes the
- * question "which of these belong in a Companion button" a safety question
- * rather than a convenience one: a button is pressed by someone mid-show who
- * is looking at a camera, not at a confirmation dialog.
+ * The device exposes 88 writable parameters through its own web forms — every
+ * `send_form`/`send_form_combo` call across its 41 pages — and every one of
+ * them is a plain `GET` with no authentication. That makes the question "which
+ * of these belong in a Companion button" a safety question rather than a
+ * convenience one: a button is pressed by someone mid-show who is looking at a
+ * camera, not at a confirmation dialog.
  *
- * Six actions change how the receiver listens and are always available. Three
- * more interrupt reception — preset recall, preset store and reboot — and are
- * registered as `undefined` unless the connection's "interrupting actions"
- * switch is on, so they are absent from the list rather than present and
- * ignored. Restoring defaults, licence entry and key material are refused in
- * `api.ts` whatever the switch says: a reboot comes back, a wiped configuration
- * does not.
+ * Most of what is here is built from `CONTROL_SETTINGS`, the one table that
+ * also drives the variables, the "setting is" feedback and the presets. The
+ * exceptions below are the ones that are not a choice between fixed values:
+ * frequency is a number, the web ID is free text, and preset recall/store and
+ * reboot are momentary triggers rather than settings.
+ *
+ * The interrupting ones — preset recall, preset store, reboot, and the four
+ * downconverter supplies — are registered as `undefined` unless the
+ * connection's switch is on, so they are absent from the list rather than
+ * present and ignored. Restoring defaults, licence entry and key material are
+ * refused in `api.ts` whatever the switch says: a reboot comes back, a wiped
+ * configuration does not.
  */
 
-/**
- * Options the receiver accepts, from docs/LYNX_L2174_API.md §3.2. Exported so
- * `presets.ts` builds one button per value from the same list, rather than
- * keeping a second copy that can drift from the one the actions validate.
- */
-export const BANDWIDTHS = ['3MHz', '4MHz', '5MHz', '6MHz', '7MHz', '8MHz', '10MHz', '12MHz']
-export const RX_MODES = ['DVBT', 'LMST(S)', 'LMST(D)']
-export const ON_OFF = ['Off', 'On']
-export const DECODER_SOURCES = ['Ext ASI', 'Demodulator', 'Diversity', 'IP']
+type ChoiceOptions = { options: { value: string } }
+type ChannelChoiceOptions = { options: { channel: string; value: string } }
 
 export type ActionsSchema = {
+	// Hand-written: not a choice between fixed values.
 	set_frequency: { options: { frequency: number } }
-	set_bandwidth: { options: { bandwidth: string } }
-	set_rx_mode: { options: { mode: string } }
-	set_decoder_source: { options: { source: string } }
-	set_demod_diversity: { options: { state: string } }
 	set_web_id: { options: { text: string } }
 	recall_preset: { options: { preset: number } }
 	store_preset: { options: { preset: number } }
 	reboot_receiver: { options: Record<string, never> }
+
+	// From CONTROL_SETTINGS. Listed out rather than derived so the ids stay
+	// greppable and the option shapes stay checked; `controls.ts` is the source
+	// of the values, this is the source of the types.
+	set_rx_mode: { options: { mode: string } }
+	set_bandwidth: { options: { bandwidth: string } }
+	set_decoder_source: { options: { source: string } }
+	set_demod_diversity: { options: { state: string } }
+	set_guard_interval: ChoiceOptions
+	set_spectral_polarity: ChoiceOptions
+	set_channel_enable: ChannelChoiceOptions
+	set_lnb_power: ChannelChoiceOptions
+	set_asi_output_source: ChoiceOptions
+	set_ip_output_source: ChoiceOptions
+	set_asi_diversity: ChoiceOptions
+	set_diversity_delay: ChoiceOptions
+	set_video_input_mode: ChoiceOptions
+	set_genlock: ChoiceOptions
+	set_freeze_on_loss: ChoiceOptions
+	set_video_output_1: ChoiceOptions
+	set_video_output_2: ChoiceOptions
+	set_overlay_type: ChoiceOptions
+	set_overlay_background: ChoiceOptions
+	set_overlay_colour: ChoiceOptions
+	set_status_pin_mode: ChoiceOptions
+	set_status_pin_state: ChoiceOptions
+	set_status_pin_alarm_level: ChoiceOptions
 }
 
-// Generic over the id so it stays a literal: the SDK ties each option's id to
-// the key in ActionsSchema, which is what catches a field the schema never
-// declared — widen it to `string` and that safety net is gone.
-function dropdown<K extends string>(id: K, label: string, choices: string[], fallback: string) {
-	return {
+type Write = (name: string, value: string, verify?: boolean) => Promise<boolean>
+
+/**
+ * 'Receive mode' -> 'receive mode', but 'ASI output source' is left alone.
+ *
+ * The labels double as the preset group headings, where they are capitalised;
+ * in an action name they sit mid-sentence after "Set". Lowercasing the lot
+ * turned ASI and IP into asi and ip.
+ */
+function lowerFirst(label: string): string {
+	const [first] = label.split(' ')
+	if (first && first === first.toUpperCase()) return label
+	return label.charAt(0).toLowerCase() + label.slice(1)
+}
+
+/**
+ * One action for one row of `CONTROL_SETTINGS`.
+ *
+ * Both the dropdown and the check in the callback read the same `values`, so a
+ * value the receiver does not accept cannot reach `iframe.php` — which answers
+ * 200 to anything and would otherwise swallow a typo silently.
+ */
+function controlAction(setting: ControlSetting, write: Write, warn: (message: string) => void) {
+	const channelOption = {
 		type: 'dropdown' as const,
-		id,
-		label,
-		default: fallback,
-		choices: choices.map((c) => ({ id: c, label: c })),
+		id: 'channel',
+		label: 'Channel',
+		default: '1',
+		choices: CONTROL_CHANNELS.map((n) => ({ id: String(n), label: `Channel ${n}` })),
+	}
+	const valueOption = {
+		type: 'dropdown' as const,
+		id: setting.optionId,
+		label: setting.label,
+		default: setting.values[0],
+		choices: setting.values.map((v) => ({ id: v, label: v })),
+	}
+
+	return {
+		name: setting.actionName ?? `Set ${lowerFirst(setting.label)}`,
+		description: setting.description,
+		options: setting.perChannel ? [channelOption, valueOption] : [valueOption],
+		callback: async (action: { options: Record<string, unknown> }) => {
+			// The dropdown only ever yields a string, but an imported config or the
+			// HTTP API can put anything here, and the membership check below is what
+			// actually decides — so coerce the primitive cases and let the rest fail
+			// that check rather than reaching the receiver as "[object Object]".
+			const raw = action.options[setting.optionId]
+			const value = typeof raw === 'string' || typeof raw === 'number' ? String(raw) : ''
+			if (!setting.values.includes(value)) {
+				warn(`Ignoring ${setting.label} ${JSON.stringify(value)}: the receiver does not offer that value`)
+				return
+			}
+
+			let channel: number | undefined
+			if (setting.perChannel) {
+				channel = Number(action.options.channel)
+				if (!CONTROL_CHANNELS.some((n) => n === channel)) {
+					warn(`Ignoring channel ${JSON.stringify(action.options.channel)}: the receiver has channels 1-4`)
+					return
+				}
+			}
+
+			// Nothing to read back for a parameter the receiver does not publish,
+			// so asking for verification would warn on every success.
+			await write(controlParameter(setting, channel), value, Boolean(setting.variable))
+		},
 	}
 }
 
@@ -74,8 +155,23 @@ export function UpdateActions(self: ModuleInstance): void {
 	}
 
 	const guarded = guardedActionsEnabled(self)
+	const warn = (message: string) => self.log('warn', message)
 
-	self.setActionDefinitions({
+	// Built in two parts: the rows of CONTROL_SETTINGS, then the handful that are
+	// not a choice between fixed values. The cast is where the table's `string`
+	// ids meet the schema's literal ones — `unlistedControlParameters()` checks
+	// at startup that every row is one the allowlist permits, which is the part
+	// that actually matters.
+	const definitions: Record<string, unknown> = {}
+
+	for (const setting of CONTROL_SETTINGS) {
+		definitions[setting.actionId] = setting.guarded && !guarded ? undefined : controlAction(setting, write, warn)
+	}
+
+	// Typed separately from the loop above so the SDK still ties each option id
+	// to its entry in ActionsSchema — that check is what catches a field the
+	// schema never declared.
+	const handwritten: Partial<Parameters<typeof self.setActionDefinitions>[0]> = {
 		set_frequency: {
 			name: 'Set receive frequency',
 			description: 'Retunes the demodulator. The link drops until the transmitter matches.',
@@ -103,32 +199,6 @@ export function UpdateActions(self: ModuleInstance): void {
 				// Six decimals is what the receiver's own web form sends.
 				await write('DB_L2174_FREQ1', Math.min(10, Math.max(0.0068, ghz)).toFixed(6))
 			},
-		},
-
-		set_bandwidth: {
-			name: 'Set channel bandwidth',
-			options: [dropdown('bandwidth', 'Bandwidth', BANDWIDTHS, '10MHz')],
-			callback: async (action) => void (await write('DB_L2174_CHAN_BW', action.options.bandwidth)),
-		},
-
-		set_rx_mode: {
-			name: 'Set receive mode',
-			description: 'DVB-T or the Vislink LMS-T modes. Changing this re-acquires the signal.',
-			options: [dropdown('mode', 'Mode', RX_MODES, 'LMST(S)')],
-			callback: async (action) => void (await write('DB_L2174_RX_MODE', action.options.mode)),
-		},
-
-		set_decoder_source: {
-			name: 'Set decoder source',
-			description: 'Which input the decoder takes its transport stream from.',
-			options: [dropdown('source', 'Source', DECODER_SOURCES, 'Demodulator')],
-			callback: async (action) => void (await write('DB_DEMOD_ASI1_OUTPUT_MUX', action.options.source)),
-		},
-
-		set_demod_diversity: {
-			name: 'Set demodulator diversity',
-			options: [dropdown('state', 'Diversity', ON_OFF, 'On')],
-			callback: async (action) => void (await write('DB_L2174_DEMOD_DIVERSITY', action.options.state)),
 		},
 
 		set_web_id: {
@@ -193,7 +263,10 @@ export function UpdateActions(self: ModuleInstance): void {
 					callback: async () => void (await write('DB_L2174_REBOOT', 'Yes', false)),
 				}
 			: undefined,
-	})
+	}
+
+	Object.assign(definitions, handwritten)
+	self.setActionDefinitions(definitions as Parameters<typeof self.setActionDefinitions>[0])
 }
 
 /** Preset slots the receiver offers, per settings.xml: 1-16. */

@@ -19,8 +19,8 @@ against that same receiver (all 39 variables populate correctly; see the
       power/MER/temperature/voltage threshold — each with a below/above
       direction rather than the comparison baked into the name
 - [x] Load the module into a real Companion instance and verify against the receiver
-- [x] Presets: 55 ready-made buttons in four sections (Signal / Decoder /
-      Control / Unit)
+- [x] Presets: 146 ready-made buttons in seven sections (Signal, Decoder,
+      Control — RF / Routing / Video / Unit, Unit)
 
 ### Verified against real hardware (2026-09-04)
 
@@ -97,18 +97,35 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
 - [x] Verify the pattern above against a lab unit, starting with a harmless,
       easily-reversible parameter (`DB_L2174_WEB_TEXT`) — done 2026-10-20 on
       "Rx Relais" (`10.81.5.149`), see `docs/LYNX_L2174_API.md` §6
-- [x] Decide which of the 38 GUI-writable parameters are safe and useful as
-      Companion actions — a two-tier allowlist in `src/api.ts`: six parameters
-      are always writable, four more only with the connection's "interrupting
-      actions" switch, and everything else is refused whatever the switch says
-- [x] Implement — nine actions, and one Control button per value for the four
-      that are a choice rather than a number. Preset recall, preset store and
+- [x] Decide which of the 88 GUI-writable parameters are safe and useful as
+      Companion actions — a two-tier allowlist in `src/api.ts`: 27 parameters
+      are always writable, 8 more only with the connection's "interrupting
+      actions" switch (preset recall/store, reboot, and the four downconverter
+      supplies, which put DC on an antenna input), and everything else is
+      refused whatever the switch says
+- [x] Implement — 28 actions, and one Control button per value for the 23 that
+      are a choice rather than a number, all built from one table
+      (`src/controls.ts`). Preset recall, preset store and
       reboot are absent from the action list until the switch is on, rather
       than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
       material stay refused outright
-- [x] Verify on the lab unit (`10.81.5.149`, 2026-10-20): every action, and
-      preset recall end to end — 30 parameters changed, the receiver put the
-      recall trigger back to `No` by itself, and the IP address was untouched
+- [x] Verify on the lab unit (`10.81.5.149`, 2026-10-20): the first six
+      actions, preset recall end to end (30 parameters changed, the receiver
+      put the recall trigger back to `No` by itself, the IP address untouched),
+      and `DB_DECOD_FREEZE_ON_LOSS` from the new batch
+- [ ] 18 of the 19 new actions are untested on hardware. The downconverter
+      supplies matter most: `DB_L2174_LNB_PWR_1..4` has no GUI page of its own
+      (`docs/LYNX_L2174_API.md` §4), so whether the receiver accepts the write
+      at all is unproven. The read-back would say so honestly, but it has not
+      been tried
+
+Deliberately left out: AES/BISS/EBS key material, licence entry,
+`DB_RESTORE_DEFAULTS` and the descrambling type (all refused in `api.ts`);
+IP and network configuration (a wrong gateway and the unit is gone);
+downconverter type and LO frequency (tied to the hardware actually fitted, and
+a wrong value kills reception silently); the CCU and L1500 return path (not
+testable without a camera and a modem). `DB_L2174_SET_ALL` is a momentary
+trigger that copies channel 1 to all four — not in yet, undecided.
 
 Still open on the control side:
 
@@ -117,9 +134,15 @@ Still open on the control side:
 - [ ] No test setup in this repo at all. A hardware-free test over
       `buildVariableValues`, `settingMatches` and the preset ids would cover
       the fiddly parts (`'001'` against `1`, state cleared on contact loss)
-- [ ] `set_rx_mode` writes `DB_L2174_RX_MODE` while the `rx_mode` variable
-      reads `DB_DEMOD_RX_MODE`. The two agreed on the bench unit; nothing
-      guarantees they always will
+- [x] `set_rx_mode` wrote `DB_L2174_RX_MODE` while `rx_mode` read
+      `DB_DEMOD_RX_MODE` — fixed 2026-10-20 after the bench unit showed the two
+      use different words for the same mode (`DVBT` against `DVB-T`). `rx_mode`
+      is now the setting; `rx_mode_detected` is the demodulator's readout
+- [ ] Dropdown values are the full sets, hardcoded from `settings.xml`. The
+      device also publishes which of them are selectable *right now*
+      (`enabled="yes|no"`, and it changes with the receive mode), so the lists
+      could be built per connection instead. Bigger change: `settings.xml` would
+      have to be fetched and the action definitions rebuilt on connect
 
 ## Publishing
 

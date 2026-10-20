@@ -4,12 +4,13 @@ Monitors a Vislink Lynx L2174 RF broadcast receiver through its built-in
 `data.xml` status page and exposes the receiver's state as Companion variables
 and feedbacks.
 
-**What it may change.** The module reads freely and writes only the six
-parameters its actions need — frequency, bandwidth, receive mode, decoder
-source, diversity and the display name. Everything else the receiver would
-accept is refused in the client itself, so a mistake cannot reach it. Preset
-recall, preset store and reboot interrupt reception and are hidden until you
-switch them on per connection (see Configuration).
+**What it may change.** The module reads freely and writes only the 35
+parameters its actions need — reception, routing, video output and the status
+pin. Everything else the receiver would accept is refused in the client itself,
+so a mistake cannot reach it: key material, licence entry, restoring defaults
+and the network configuration are never written, whatever the module is asked
+to do. Eight of the 35 are hidden until you switch them on per connection:
+preset recall and store, reboot, and downconverter power (see Configuration).
 
 The receiver has no authentication: anything that can reach it on the network
 can reconfigure it. That is a property of the device, not of this module, and
@@ -23,7 +24,7 @@ than a list of things to avoid.
 | Receiver address     | IP address or hostname of the L2174.                                                                        |
 | Port                 | Normally `80`.                                                                                              |
 | Poll interval        | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second. |
-| Interrupting actions | Off by default. While off, preset recall, preset store and reboot are not offered at all.                   |
+| Interrupting actions | Off by default. While off, preset recall and store, reboot and downconverter power are not offered at all.  |
 
 There is nothing to configure about the transport — the receiver serves
 `data.xml` over plain HTTP with no authentication.
@@ -135,14 +136,34 @@ surely as too little. Its preset stacks four feedbacks: green from −6 to
 
 ## Presets
 
-The module ships 21 ready-made buttons, grouped in three sections you can drag
-straight onto a page:
+The module ships 146 ready-made buttons you can drag straight onto a page.
+Monitoring first, then one button per value for everything the actions can set:
 
-| Section     | Buttons                                                                      |
-| ----------- | ---------------------------------------------------------------------------- |
-| **Signal**  | RF lock plus power and MER as traffic lights — one of each per channel (1–4) |
-| **Decoder** | Video lock, detected video format, audio 1 + 2 lock                          |
-| **Unit**    | Alarm status, camera battery, the three temperatures, and unit identity      |
+| Section               | Buttons                                                                           |
+| --------------------- | --------------------------------------------------------------------------------- |
+| **Signal**            | RF lock plus power and MER as traffic lights — one of each per channel (1–4)      |
+| **Decoder**           | Video lock, detected video format, audio 1 + 2 lock                               |
+| **Control — RF**      | Receive mode, bandwidth, guard interval, polarity, channel enable, retune         |
+| **Control — Routing** | Decoder source, ASI and IP output source, the three diversity inputs, delay       |
+| **Control — Video**   | Video input mode, genlock, on-signal-loss, both output formats, the overlay       |
+| **Control — Unit**    | Status pin mode, state and alarm level                                            |
+| **Unit**              | Alarm status, camera battery, the three temperatures, and unit identity           |
+
+With **interrupting actions** on, Control — RF gains downconverter power per
+channel, and Control — Unit gains recall and store for all 16 preset slots plus
+reboot.
+
+The per-channel controls — channel enable, and downconverter power when it is
+switched on — put all four channels in one group rather than one group each.
+The channel is on the button itself (`RF1`…`RF4`, `LNB1`…`LNB4`).
+
+**Control buttons show what is set, not just what they would do.** Each carries
+a *setting is* feedback and turns green while the receiver already holds that
+value, so a row of them reads at a glance as "this is the one we are on". Three
+kinds stay dark on purpose: preset recall, because the receiver only reports
+which slot is *selected* and not which one is still in force; the status pin
+state, which the receiver does not report at all; and store and reboot, which
+are red instead, because neither can be taken back.
 
 Lock buttons start red and turn green once the receiver reports lock, so a
 healthy rack reads green at a glance. The power, MER and camera battery
@@ -163,15 +184,33 @@ edit once the button is on the page.
 | **Set receive mode**          | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                         |
 | **Set decoder source**        | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                      |
 | **Set demodulator diversity** | On or off.                                                                                                                      |
+| **Set guard interval**        | `1/32`, `1/16`, `1/8`, `1/4` or `Auto`. Fixing it shortens acquisition.                                                         |
+| **Set spectral polarity**     | `Normal`, `Inverted` or `Auto`.                                                                                                 |
+| **Set channel enable**        | Takes one diversity input (1–4) in or out of the combination.                                                                   |
+| **Set ASI output source**     | What feeds the ASI output.                                                                                                      |
+| **Set IP output source**      | What feeds the IP output, or `Off`.                                                                                             |
+| **Set ASI diversity input**   | Whether the external ASI input joins the diversity combination.                                                                 |
+| **Set diversity delay**       | `Auto` lines up inputs arriving over different path lengths.                                                                    |
+| **Set video input mode**      | Which codec the decoder expects. The wrong one gives no picture, not a bad one.                                                 |
+| **Set frame lock (genlock)**  | `Off`, `SD` or `HD`. `genlock_error` says whether it took.                                                                      |
+| **Set on signal loss**        | What the output shows when the link drops: the last frame, or blue.                                                             |
+| **Set video output 1 / 2**    | `SDI` or `SDI+Overlay`; output 2 also does composite on units fitted for it.                                                    |
+| **Set overlay type**          | `Basic` or `Service`. Only visible on an output set to `+Overlay`.                                                              |
+| **Set overlay background**    | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                               |
+| **Set overlay colour**        | `White` or `Green`.                                                                                                             |
+| **Set status pin mode**       | Whether the status pin follows the alarm state or is driven by hand.                                                            |
+| **Set status pin state**      | Drives the pin directly. Only has an effect in `Manual` mode, and the receiver does not report it back.                         |
+| **Set status pin level …**    | Which level the pin takes when an alarm is active.                                                                              |
 | **Set web ID**                | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered. |
 
-With **interrupting actions** switched on, three more appear:
+With **interrupting actions** switched on, four more appear:
 
-| Action              | Effect                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------- |
-| **Recall preset**   | Loads a stored configuration — frequency, bandwidth, mode and routing change at once. |
-| **Store preset**    | Overwrites the chosen slot with the current settings. The previous contents are gone. |
-| **Reboot receiver** | Off air for about a minute.                                                           |
+| Action                     | Effect                                                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Recall preset**          | Loads a stored configuration — frequency, bandwidth, mode and routing change at once.                      |
+| **Store preset**           | Overwrites the chosen slot with the current settings. The previous contents are gone.                      |
+| **Reboot receiver**        | Off air for about a minute.                                                                                |
+| **Set downconverter power** | Puts DC on an antenna input (1–4) to feed a downconverter. Whatever is on the far end of that coax gets it. |
 
 Switching the setting back off removes them from the list again, but a button
 that already carries one keeps it and goes quiet: pressing it does nothing
@@ -180,7 +219,16 @@ before wondering why it stopped working.
 
 Writes are read back. The receiver answers every write with `200` even when it
 discards the value, so the module polls again afterwards and logs a warning if
-the parameter still does not read what was set.
+the parameter still does not read what was set. Each parameter is tracked on
+its own, so pressing several buttons in quick succession does not cancel the
+earlier checks. Two writes have nothing to read back and are not checked: the
+momentary triggers (recall, store, reboot) reset themselves the moment the
+receiver acts, and the status pin state is absent from `data.xml`.
+
+The value lists are the full sets the receiver accepts, not what it will take
+right now — it narrows them depending on the mode (in LMS-T it offers only
+6/7/8 MHz of bandwidth). Setting one it does not currently want is answered
+with `200` and discarded, and the read-back is what tells you.
 
 ## Polling and load on the receiver
 

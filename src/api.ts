@@ -125,11 +125,39 @@ export function parseParameters(xml: string): RawParameters {
  * are simply not listed — which under an allowlist is all it takes.
  */
 export const SAFE_PARAMETERS: ReadonlySet<string> = new Set([
+	// RF
 	'DB_L2174_FREQ1',
 	'DB_L2174_CHAN_BW',
 	'DB_L2174_RX_MODE',
+	'DB_DEMOD_GUARD_INT',
+	'DB_DEMOD_SPEC_POL',
+	'DB_DEMOD_ENABLE_1',
+	'DB_DEMOD_ENABLE_2',
+	'DB_DEMOD_ENABLE_3',
+	'DB_DEMOD_ENABLE_4',
+
+	// Routing
 	'DB_DEMOD_ASI1_OUTPUT_MUX',
+	'DB_DEMOD_ASI2_OUTPUT_MUX',
+	'DB_DEMOD_IP1_OUTPUT_MUX',
 	'DB_L2174_DEMOD_DIVERSITY',
+	'DB_L2174_ASI_DIVERSITY',
+	'DB_DEMOD_DIV_DELAY',
+
+	// Video
+	'DB_L2174_VIDEO_INPUT_MODE',
+	'DB_DECOD_GEN_LOCK',
+	'DB_DECOD_FREEZE_ON_LOSS',
+	'DB_DECOD_VIDEO_A_TYPE',
+	'DB_DECOD_VIDEO_B_TYPE',
+	'DB_DECOD_OVERLAY_TYPE',
+	'DB_DECOD_OVERLAY_BACKGROUND',
+	'DB_DECOD_OVERLAY_ENABLE',
+
+	// Unit
+	'DB_STATUS_PIN_MODE',
+	'DB_STATUS_PIN_STATE',
+	'DB_STATUS_PIN_ALARM_LEVEL',
 	'DB_L2174_WEB_TEXT',
 ])
 
@@ -144,6 +172,14 @@ export const SAFE_PARAMETERS: ReadonlySet<string> = new Set([
  * and ignored.
  */
 export const GUARDED_PARAMETERS: ReadonlySet<string> = new Set([
+	// Puts DC on an antenna input. Whatever is on the far end of that coax gets
+	// it, so this is a hardware risk rather than only an interruption — the one
+	// thing behind this switch that is not about going off air.
+	'DB_L2174_LNB_PWR_1',
+	'DB_L2174_LNB_PWR_2',
+	'DB_L2174_LNB_PWR_3',
+	'DB_L2174_LNB_PWR_4',
+
 	'DB_L2174_PRESET_NUM',
 	'DB_L2174_PRESET_RECALL',
 	'DB_L2174_PRESET_STORE',

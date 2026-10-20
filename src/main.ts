@@ -10,8 +10,9 @@ import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions, type ActionsSchema } from './actions.js'
 import { UpdateFeedbacks, ALL_FEEDBACKS, type FeedbacksSchema } from './feedbacks.js'
 import { UpdatePresets } from './presets.js'
-import { LynxApi, classifyFailure, type ContactFailure } from './api.js'
-import { CHANNEL_IDS, SETTING_SOURCES, type SettingId } from './types.js'
+import { GUARDED_PARAMETERS, LynxApi, SAFE_PARAMETERS, classifyFailure, type ContactFailure } from './api.js'
+import { CHANNEL_IDS, SETTING_SOURCES } from './types.js'
+import { driftedControlIds, unlistedControlParameters } from './controls.js'
 
 export type ModuleSchema = {
 	config: ModuleConfig
@@ -70,7 +71,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		 * What the receiver currently has selected, for the control buttons to
 		 * match themselves against. Keyed the way `SETTING_SOURCES` names them.
 		 */
-		settings: {} as Partial<Record<SettingId, string>>,
+		settings: {} as Record<string, string | undefined>,
 	}
 
 	#api: LynxApi | null = null
@@ -80,13 +81,39 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	#pollIntervalMs = 2000
 	#consecutiveFailures = 0
 	#lastError = ''
-	/** The write we are still waiting to see reflected in data.xml. */
-	#pendingWrite: { name: string; value: string } | undefined
-	#writeWatchdog: NodeJS.Timeout | undefined
+	/**
+	 * Writes we are still waiting to see reflected in data.xml, by parameter.
+	 *
+	 * A map rather than one slot: with a wall of control buttons, two presses
+	 * inside the settling window are ordinary, and a single slot meant the
+	 * second write silently cancelled the first one's check — including when the
+	 * second was a momentary trigger that asks for no check at all.
+	 */
+	#pendingWrites = new Map<string, { value: string; timer: NodeJS.Timeout }>()
+	/** Host and port the current client was built for, to spot a real retarget. */
+	#connectedTo = ''
 	#hasLoggedSuccess = false
 
 	async init(config: ModuleConfig): Promise<void> {
 		this.config = config
+
+		// The control table and the allowlist are kept by hand on purpose — one
+		// describes buttons, the other decides what may be written, and the second
+		// must not be derivable from the first. Checked rather than trusted: a row
+		// the allowlist does not permit yields an action that looks fine and fails
+		// on the press, and the log is a better place to learn that than a show.
+		const unlisted = unlistedControlParameters(SAFE_PARAMETERS, GUARDED_PARAMETERS)
+		if (unlisted.length) {
+			this.log('error', `Control settings the write allowlist does not back: ${unlisted.join(', ')}`)
+		}
+
+		// Same idea one level up: the action and option ids are what saved buttons
+		// hold, and `actions.ts` casts away the type that would otherwise catch a
+		// rename. A drifted id leaves a button that looks right and does nothing.
+		const drifted = driftedControlIds()
+		if (drifted.length) {
+			this.log('error', `Control actions renamed without an upgrade script: ${drifted.join(', ')}`)
+		}
 
 		this.updateActions()
 		this.updateFeedbacks()
@@ -98,8 +125,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	async destroy(): Promise<void> {
 		this.#stopPolling()
-		clearTimeout(this.#writeWatchdog)
-		this.#pendingWrite = undefined
+		this.#forgetPendingWrites()
 		this.#api?.destroy()
 		this.#api = null
 	}
@@ -133,11 +159,33 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		if (!api) throw new Error('Not connected to a receiver')
 
 		this.log('info', `Setting ${name} = ${value}`)
+		// Which receiver this write is going to. The request below can be in
+		// flight for up to the socket timeout, and the connection can be pointed
+		// somewhere else in the meantime — in which case there is nothing left to
+		// read this value back from, and the pending check must not be created.
+		const target = this.#connectedTo
 		await api.setParameter(name, value)
+		if (this.#connectedTo !== target) {
+			this.log('warn', `${name} was set on a receiver this connection no longer points at; not checking it`)
+			return
+		}
+
 		// Momentary triggers ('Yes' on preset recall, store and reboot) drop back
 		// to 'No' the moment the receiver acts on them, so reading them back would
-		// warn on every success — the opposite of what the check is for.
-		this.#pendingWrite = verify ? { name, value } : undefined
+		// warn on every success — the opposite of what the check is for. Only this
+		// parameter's own check is dropped; others stay pending.
+		this.#forgetPendingWrite(name)
+		if (verify) {
+			// iframe.php answers 200 even when it discards the value, so the only
+			// honest confirmation is reading it back. Say so when it did not take,
+			// rather than leaving someone to press the button a second time.
+			const timer = setTimeout(() => {
+				this.#pendingWrites.delete(name)
+				this.log('warn', `${name} still does not read ${JSON.stringify(value)} — the receiver may have rejected it`)
+			}, 4500)
+			timer.unref?.()
+			this.#pendingWrites.set(name, { value, timer })
+		}
 
 		// Measured on the bench: the receiver takes between 0.3 s and 3 s to
 		// apply a write and publish it in data.xml, depending on the parameter —
@@ -146,19 +194,20 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// the later one catches whatever had not settled yet.
 		setTimeout(() => void this.#poll(), 1200)
 		setTimeout(() => void this.#poll(), 3500)
+	}
 
-		// iframe.php answers 200 even when it discards the value, so the only
-		// honest confirmation is reading it back. Say so when it did not take,
-		// rather than leaving someone to press the button a second time.
-		setTimeout(() => {
-			const pending = this.#pendingWrite
-			if (!pending) return
-			this.#pendingWrite = undefined
-			this.log(
-				'warn',
-				`${pending.name} still does not read ${JSON.stringify(pending.value)} — the receiver may have rejected it`,
-			)
-		}, 4500)
+	/** Stop waiting on one parameter, without touching the others. */
+	#forgetPendingWrite(name: string): void {
+		const pending = this.#pendingWrites.get(name)
+		if (!pending) return
+		clearTimeout(pending.timer)
+		this.#pendingWrites.delete(name)
+	}
+
+	/** Stop waiting on everything — the receiver is gone or the address changed. */
+	#forgetPendingWrites(): void {
+		for (const pending of this.#pendingWrites.values()) clearTimeout(pending.timer)
+		this.#pendingWrites.clear()
 	}
 
 	updateActions(): void {
@@ -185,14 +234,21 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#stopPolling()
 
 		const host = this.config.host?.trim()
+		// A write still waiting on the old address would otherwise be confirmed,
+		// or denied, by a different box. Tied to the address actually changing:
+		// `#connect()` also runs when only the poll interval or the guarded switch
+		// moved, and dropping the checks there would lose the one warning that
+		// explains why a button did not take.
+		const target = `${host ?? ''}:${this.config.port || 80}`
+		if (target !== this.#connectedTo) this.#forgetPendingWrites()
+		this.#connectedTo = target
+
 		if (!host) {
 			// Without this the previous client survives: the buttons would keep the
 			// last good poll's colours for ever, and — worse — an action would still
 			// write to the address that was just removed from the form.
 			this.#api?.destroy()
 			this.#api = null
-			clearTimeout(this.#writeWatchdog)
-			this.#pendingWrite = undefined
 			this.state.contact = 'no-reading-yet'
 			this.#clearState()
 			this.setVariableValues(blankVariableValues())
@@ -265,8 +321,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.setVariableValues(values)
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 
-			const pending = this.#pendingWrite
-			if (pending && params[pending.name] === pending.value) this.#pendingWrite = undefined
+			for (const [name, pending] of this.#pendingWrites) {
+				if (params[name] === pending.value) this.#forgetPendingWrite(name)
+			}
 
 			this.#consecutiveFailures = 0
 			this.state.contact = 'ok'
@@ -285,7 +342,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.#hasLoggedSuccess = false
 			// The lost connection is already reported; a write that went unconfirmed
 			// because of it does not need a second line saying the same thing.
-			this.#pendingWrite = undefined
+			this.#forgetPendingWrites()
 
 			// Blank the readings rather than leaving stale values on screen —
 			// a frozen power reading is worse than an obviously empty one.
@@ -343,12 +400,12 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.state.bestPower = powers.length ? Math.max(...powers) : undefined
 		this.state.bestMer = mers.length ? Math.max(...mers) : undefined
 
-		for (const [id, source] of Object.entries(SETTING_SOURCES)) {
+		for (const source of SETTING_SOURCES) {
 			// A parameter the receiver did not report arrives as '' from
 			// `buildVariableValues`. Keep that as "we do not know" rather than as a
 			// value, so a control button cannot read as selected on the strength of
 			// two empty strings matching.
-			this.state.settings[id as SettingId] = values[source.variable] || undefined
+			this.state.settings[source.id] = values[source.variable as keyof VariablesSchema] || undefined
 		}
 	}
 

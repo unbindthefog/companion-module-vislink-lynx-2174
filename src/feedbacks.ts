@@ -78,6 +78,14 @@ export const ALARM_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
 export const OK_STYLE = { bgcolor: 0x00c000, color: 0x000000 }
 export const WARNING_STYLE = { bgcolor: 0xff8000, color: 0x000000 }
 export const READOUT_STYLE = { bgcolor: 0x000000, color: 0xffffff }
+/**
+ * A button that cannot be taken back: store over a preset slot, reboot.
+ *
+ * The same red as an alarm, on purpose — both say "stop and look" — but its own
+ * constant, because the two mean different things and may want to part ways.
+ * On a readout red is a measurement; here it is a warning about the press.
+ */
+export const DESTRUCTIVE_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
 /** Not "fine" and not "broken": we do not know. Grey, never red. */
 export const UNKNOWN_STYLE = { bgcolor: 0x555555, color: 0xcccccc }
 
@@ -351,12 +359,12 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 					id: 'setting',
 					label: 'Setting',
 					default: 'mode',
-					choices: Object.entries(SETTING_SOURCES).map(([id, source]) => ({ id, label: source.label })),
+					choices: SETTING_SOURCES.map((source) => ({ id: source.id, label: source.label })),
 				},
 				{
 					type: 'textinput',
 					id: 'value',
-					label: 'Value (as the receiver spells it, e.g. "10MHz", "LMST(S)", "On")',
+					label: 'Value, spelled as the receiver reports it — "10MHz", "LMST(S)", "On", and preset slots as "001"',
 					default: '',
 				},
 			],
