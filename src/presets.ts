@@ -1,11 +1,12 @@
 import type { CompanionPresetDefinitions, CompanionPresetSection } from '@companion-module/base'
 import type ModuleInstance from './main.js'
 import type { ModuleSchema } from './main.js'
-import { ALARM_STYLE, OK_STYLE, READOUT_STYLE, WARNING_STYLE } from './feedbacks.js'
+import { ALARM_STYLE, OK_STYLE, READOUT_STYLE, UNKNOWN_STYLE, WARNING_STYLE } from './feedbacks.js'
 import { CHANNEL_IDS } from './types.js'
 
 type Presets = CompanionPresetDefinitions<ModuleSchema>
 type Sections = CompanionPresetSection<ModuleSchema>[]
+type PresetFeedback = NonNullable<Presets[string]>['feedbacks'][number]
 
 /**
  * Placeholder prefix for this connection's own variables. Companion rewrites
@@ -50,6 +51,19 @@ const TEMPERATURE_SENSORS = [
 	{ id: 'decoder', caption: 'TEMP DEC', variable: 'decoder_fpga_temperature' },
 ] as const
 
+/**
+ * The grey cover every monitoring button ends with.
+ *
+ * Last in the list, so it wins over whatever the thresholds below decided: a
+ * reading we do not have must not read as a reading that is fine, and must not
+ * read as a fault either. `source` is 'unit' for anything the receiver reports
+ * about itself, or a channel number where "nothing to measure" also counts as
+ * not knowing.
+ */
+function unknownCover(source: string): PresetFeedback {
+	return { feedbackId: 'reading_unknown', options: { source }, style: UNKNOWN_STYLE, headline: 'Unknown — grey' }
+}
+
 export function UpdatePresets(self: ModuleInstance): void {
 	const presets: Presets = {}
 
@@ -60,7 +74,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 			name: `Channel ${n} — RF lock`,
 			keywords: ['rf', 'lock', 'channel', `${n}`],
 			style: { ...ALARM_STYLE, text: readout(`RF${n}`, `channel${n}_lock`), size: '14' },
-			feedbacks: [{ feedbackId: 'channel_locked', options: { channel: n }, style: OK_STYLE }],
+			feedbacks: [{ feedbackId: 'channel_locked', options: { channel: n }, style: OK_STYLE }, unknownCover(String(n))],
 		})
 
 		// Input power fails at both ends: too little signal and the demodulator
@@ -96,6 +110,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					style: ALARM_STYLE,
 					headline: 'Overloading the input',
 				},
+				unknownCover(String(n)),
 			],
 		})
 
@@ -119,6 +134,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					style: ALARM_STYLE,
 					headline: 'About to drop out',
 				},
+				unknownCover(String(n)),
 			],
 		})
 	}
@@ -127,14 +143,14 @@ export function UpdatePresets(self: ModuleInstance): void {
 		name: 'Video decoder lock',
 		keywords: ['video', 'lock', 'decoder'],
 		style: { ...ALARM_STYLE, text: readout('VIDEO', 'video_locked'), size: '14' },
-		feedbacks: [{ feedbackId: 'video_locked', options: {}, style: OK_STYLE }],
+		feedbacks: [{ feedbackId: 'video_locked', options: {}, style: OK_STYLE }, unknownCover('unit')],
 	})
 
 	presets['video_format'] = monitorPreset({
 		name: 'Detected video format',
 		keywords: ['video', 'format', 'standard', 'resolution'],
 		style: { ...READOUT_STYLE, text: readout('FORMAT', 'video_format'), size: '14' },
-		feedbacks: [],
+		feedbacks: [unknownCover('unit')],
 	})
 
 	presets['audio_lock'] = monitorPreset({
@@ -145,7 +161,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 			text: `AUDIO\n$(${SELF}:audio1_locked)\n$(${SELF}:audio2_locked)`,
 			size: '7',
 		},
-		feedbacks: [],
+		feedbacks: [unknownCover('unit')],
 	})
 
 	presets['alarm_status'] = monitorPreset({
@@ -153,7 +169,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		keywords: ['alarm', 'fault', 'status'],
 		// Clear is the normal case, so start green and let the feedback raise it.
 		style: { ...OK_STYLE, text: readout('ALARMS', 'alarm_summary'), size: '7' },
-		feedbacks: [{ feedbackId: 'alarm_active', options: {}, style: ALARM_STYLE }],
+		feedbacks: [{ feedbackId: 'alarm_active', options: {}, style: ALARM_STYLE }, unknownCover('unit')],
 	})
 
 	// The traffic light from HELP.md: warning first, alarm second, so the lower
@@ -175,6 +191,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 				style: ALARM_STYLE,
 				headline: 'Change the battery',
 			},
+			unknownCover('unit'),
 		],
 	})
 
@@ -189,6 +206,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					options: { source: sensor.id, direction: 'above', threshold: 80 },
 					style: ALARM_STYLE,
 				},
+				unknownCover('unit'),
 			],
 		})
 	}
@@ -201,7 +219,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 			text: `$(${SELF}:unit_web_id)\n$(${SELF}:rf_frequency)\n$(${SELF}:rx_mode)`,
 			size: '7',
 		},
-		feedbacks: [],
+		feedbacks: [unknownCover('unit')],
 	})
 
 	const sections: Sections = [

@@ -10,7 +10,7 @@ import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions, type ActionsSchema } from './actions.js'
 import { UpdateFeedbacks, ALL_FEEDBACKS, type FeedbacksSchema } from './feedbacks.js'
 import { UpdatePresets } from './presets.js'
-import { LynxApi } from './api.js'
+import { LynxApi, classifyFailure, type ContactFailure } from './api.js'
 import { CHANNEL_IDS } from './types.js'
 
 export type ModuleSchema = {
@@ -48,6 +48,13 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	/** Cached device state that feedbacks read from. */
 	state = {
+		/**
+		 * Whether we currently know anything at all, and if not, whose fault the
+		 * not-knowing is. A receiver that does not answer is a fault; our own end
+		 * having no route there is merely ignorance. The distinction is recorded
+		 * here but not yet acted on — `readingIsUnknown` greys both alike for now.
+		 */
+		contact: 'no-reading-yet' as 'no-reading-yet' | 'ok' | ContactFailure,
 		channelLock: {} as Record<number, string | undefined>,
 		channelPower: {} as Record<number, number | undefined>,
 		bestPower: undefined as number | undefined,
@@ -68,6 +75,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	#pollIntervalMs = 2000
 	#consecutiveFailures = 0
 	#lastError = ''
+	/** The write we are still waiting to see reflected in data.xml. */
+	#pendingWrite: { name: string; value: string } | undefined
+	#writeWatchdog: NodeJS.Timeout | undefined
 	#hasLoggedSuccess = false
 
 	async init(config: ModuleConfig): Promise<void> {
@@ -83,17 +93,63 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	async destroy(): Promise<void> {
 		this.#stopPolling()
+		clearTimeout(this.#writeWatchdog)
+		this.#pendingWrite = undefined
 		this.#api?.destroy()
 		this.#api = null
 	}
 
 	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
+		// The guarded actions appear and disappear with the switch, so the list has
+		// to be rebuilt rather than only reconnected.
+		this.updateActions()
 		this.#connect()
 	}
 
 	getConfigFields(): SomeCompanionConfigField[] {
 		return GetConfigFields()
+	}
+
+	/**
+	 * Write one parameter on behalf of an action, then refresh.
+	 *
+	 * The receiver rewrites data.xml on its own one-second timer, so a poll
+	 * straight after the write would still read the old value. Waiting for that
+	 * tick and then polling means the button reflects what it just did, instead
+	 * of lagging until the next scheduled poll.
+	 */
+	async writeParameter(name: string, value: string, verify = true): Promise<void> {
+		const api = this.#api
+		if (!api) throw new Error('Not connected to a receiver')
+
+		this.log('info', `Setting ${name} = ${value}`)
+		await api.setParameter(name, value)
+		// Momentary triggers ('Yes' on preset recall, store and reboot) drop back
+		// to 'No' the moment the receiver acts on them, so reading them back would
+		// warn on every success — the opposite of what the check is for.
+		this.#pendingWrite = verify ? { name, value } : undefined
+
+		// Measured on the bench: the receiver takes between 0.3 s and 3 s to
+		// apply a write and publish it in data.xml, depending on the parameter —
+		// changing the channel bandwidth is the slow one. Poll twice rather than
+		// guess a single delay: the early one keeps the button feeling immediate,
+		// the later one catches whatever had not settled yet.
+		setTimeout(() => void this.#poll(), 1200)
+		setTimeout(() => void this.#poll(), 3500)
+
+		// iframe.php answers 200 even when it discards the value, so the only
+		// honest confirmation is reading it back. Say so when it did not take,
+		// rather than leaving someone to press the button a second time.
+		setTimeout(() => {
+			const pending = this.#pendingWrite
+			if (!pending) return
+			this.#pendingWrite = undefined
+			this.log(
+				'warn',
+				`${pending.name} still does not read ${JSON.stringify(pending.value)} — the receiver may have rejected it`,
+			)
+		}, 4500)
 	}
 
 	updateActions(): void {
@@ -121,6 +177,17 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 		const host = this.config.host?.trim()
 		if (!host) {
+			// Without this the previous client survives: the buttons would keep the
+			// last good poll's colours for ever, and — worse — an action would still
+			// write to the address that was just removed from the form.
+			this.#api?.destroy()
+			this.#api = null
+			clearTimeout(this.#writeWatchdog)
+			this.#pendingWrite = undefined
+			this.state.contact = 'no-reading-yet'
+			this.#clearState()
+			this.setVariableValues(blankVariableValues())
+			this.checkFeedbacks(...ALL_FEEDBACKS)
 			this.updateStatus(InstanceStatus.BadConfig, 'No receiver address configured')
 			return
 		}
@@ -132,6 +199,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			// Give a slow receiver room to answer, but never stall longer than a
 			// few poll cycles or the connection status goes stale.
 			timeoutMs: Math.min(Math.max(2000, pollInterval * 2), 10000),
+			allowGuardedWrites: this.config.allowGuardedActions === true,
 		}
 
 		if (this.#api) {
@@ -141,6 +209,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		}
 
 		this.#hasLoggedSuccess = false
+		this.state.contact = 'no-reading-yet'
 		this.#pollIntervalMs = pollInterval
 		this.#consecutiveFailures = 0
 		this.updateStatus(InstanceStatus.Connecting)
@@ -187,7 +256,11 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.setVariableValues(values)
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 
+			const pending = this.#pendingWrite
+			if (pending && params[pending.name] === pending.value) this.#pendingWrite = undefined
+
 			this.#consecutiveFailures = 0
+			this.state.contact = 'ok'
 			this.#setError('')
 			this.updateStatus(InstanceStatus.Ok)
 
@@ -199,11 +272,16 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			}
 		} catch (e) {
 			const message = e instanceof Error ? e.message : String(e)
+			const failure = classifyFailure((e as NodeJS.ErrnoException)?.code)
 			this.#hasLoggedSuccess = false
+			// The lost connection is already reported; a write that went unconfirmed
+			// because of it does not need a second line saying the same thing.
+			this.#pendingWrite = undefined
 
 			// Blank the readings rather than leaving stale values on screen —
 			// a frozen power reading is worse than an obviously empty one.
 			this.#clearState()
+			this.state.contact = failure
 			this.setVariableValues(blankVariableValues())
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 

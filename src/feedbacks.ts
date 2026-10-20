@@ -46,6 +46,10 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: { direction: ThresholdDirection; threshold: number }
 	}
+	reading_unknown: {
+		type: 'boolean'
+		options: { source: string }
+	}
 }
 
 /** Every feedback id, so a poll can re-evaluate the lot without listing them twice. */
@@ -57,6 +61,7 @@ export const ALL_FEEDBACKS = [
 	'mer_threshold',
 	'temperature_threshold',
 	'voltage_threshold',
+	'reading_unknown',
 ] as const satisfies ReadonlyArray<keyof FeedbacksSchema>
 
 /**
@@ -68,6 +73,32 @@ export const ALARM_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
 export const OK_STYLE = { bgcolor: 0x00c000, color: 0x000000 }
 export const WARNING_STYLE = { bgcolor: 0xff8000, color: 0x000000 }
 export const READOUT_STYLE = { bgcolor: 0x000000, color: 0xffffff }
+/** Not "fine" and not "broken": we do not know. Grey, never red. */
+export const UNKNOWN_STYLE = { bgcolor: 0x555555, color: 0xcccccc }
+
+/**
+ * Should this reading be shown as unknown rather than judged?
+ *
+ * `state.contact` is one of:
+ *   'no-reading-yet'          nothing polled successfully yet
+ *   'ok'                      the last poll succeeded
+ *   'no-path-from-here'       our machine has no route (ENETUNREACH, ENOTFOUND, …)
+ *   'receiver-not-answering'  the receiver was asked and did not answer properly
+ *
+ * `source` is `'unit'` or a channel number as a string. For a channel, the lock
+ * state is in `state.channelLock[Number(source)]` (`'Locked'` / `'No Lock'`),
+ * and the readings in `state.channelPower` / `state.channelMer`.
+ *
+ * Returning `false` everywhere leaves today's behaviour untouched.
+ */
+function readingIsUnknown(state: ModuleInstance['state'], _source: string): boolean {
+	// Deliberately the simple version: any state other than a good last poll
+	// covers the button, so a reading we do not have never reads as one that is
+	// fine. Whether a locked-but-idle channel should also count as unknown is
+	// left open until it actually gets in the way — `_source` is already carried
+	// through for that day.
+	return state.contact !== 'ok'
+}
 
 export function UpdateFeedbacks(self: ModuleInstance): void {
 	self.setFeedbackDefinitions({
@@ -259,6 +290,27 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				const { direction, threshold } = feedback.options
 				return crossesThreshold(self.state.cameraBatteryVoltage, threshold, direction)
 			},
+		},
+
+		reading_unknown: {
+			name: 'Reading is unknown (grey)',
+			type: 'boolean',
+			description:
+				'Grey while this reading cannot be judged — no contact with the receiver yet, no route to it from this machine, or nothing for the channel to measure. Stack it last on a monitoring button so it covers whatever the thresholds below it decided; a value we do not have is not a value that is fine, and it is not a fault either.',
+			defaultStyle: UNKNOWN_STYLE,
+			options: [
+				{
+					type: 'dropdown',
+					id: 'source',
+					label: 'Reading',
+					default: 'unit',
+					choices: [
+						{ id: 'unit', label: 'Unit-wide (temperatures, voltage, alarms)' },
+						...CHANNEL_IDS.map((n) => ({ id: String(n), label: `Channel ${n}` })),
+					],
+				},
+			],
+			callback: (feedback) => readingIsUnknown(self.state, feedback.options.source),
 		},
 	})
 }

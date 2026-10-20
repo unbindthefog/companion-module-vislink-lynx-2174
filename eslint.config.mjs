@@ -5,6 +5,11 @@ const baseConfig = await generateEslintConfig({
 })
 
 export default [
+	{
+		// Captured device responses: someone else's 2011 JavaScript, kept verbatim
+		// as evidence. Linting it would be linting the receiver.
+		ignores: ['fixtures/**'],
+	},
 	...baseConfig,
 	{
 		// Development-only helpers. They are never packaged with the module, and

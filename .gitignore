@@ -8,3 +8,7 @@ DEBUG-*
 /.vscode
 .DS_Store
 CLAUDE.md
+
+# Raw device captures: real IPs, serials, licence codes. The redacted
+# parameters.json next to them is the committable part.
+fixtures/**/raw/

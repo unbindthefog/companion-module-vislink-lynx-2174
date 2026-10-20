@@ -93,8 +93,9 @@ reconstructed from the web UI's JavaScript only (`common/webgui.js`,
 GET /common/iframe.php?param=<NAME>&value=<VALUE>
 ```
 
-- [ ] Verify the pattern above against a lab unit, starting with a harmless,
-      easily-reversible parameter (e.g. `DB_L2174_WEB_TEXT`)
+- [x] Verify the pattern above against a lab unit, starting with a harmless,
+      easily-reversible parameter (`DB_L2174_WEB_TEXT`) — done 2026-10-20 on
+      "Rx Relais" (`10.81.5.149`), see `docs/LYNX_L2174_API.md` §6
 - [ ] Decide which of the 38 GUI-writable parameters are safe and useful as
       Companion actions
 - [ ] Implement, with confirmation-style presets for anything disruptive

@@ -8,6 +8,40 @@ export type LynxApiOptions = {
 	host: string
 	port: number
 	timeoutMs: number
+	/** Whether the interrupting writes in GUARDED_PARAMETERS are permitted. */
+	allowGuardedWrites: boolean
+}
+
+/**
+ * Who is it that does not know?
+ *
+ * A receiver that does not answer is a confirmed fault — something is wrong
+ * with the receiver. But when the failure is our own end having no way there
+ * (no route, no interface, no free local port), the receiver's state is simply
+ * unknown to us, and reporting that as a fault sends people looking in the
+ * wrong place. The distinction is already present in the error code; it just
+ * needs to survive the trip to the feedbacks.
+ *
+ * Carried but not yet acted on: `readingIsUnknown` currently greys both cases
+ * alike. The groundwork is here for the day that distinction earns its own
+ * colour.
+ */
+export type ContactFailure = 'no-path-from-here' | 'receiver-not-answering'
+
+export function classifyFailure(code: string | undefined): ContactFailure {
+	switch (code) {
+		case 'EHOSTUNREACH':
+		case 'ENETUNREACH':
+		case 'EADDRNOTAVAIL':
+		case 'EADDRINUSE':
+		case 'ENOTFOUND':
+			// Our machine cannot even pose the question.
+			return 'no-path-from-here'
+		default:
+			// ETIMEDOUT, ECONNREFUSED, ECONNRESET, EHOSTDOWN: the question was
+			// asked and the receiver did not answer properly.
+			return 'receiver-not-answering'
+	}
 }
 
 /**
@@ -67,6 +101,55 @@ export function parseParameters(xml: string): RawParameters {
  * same approach as the Sapphire RXD4 module, even though this device has no
  * TLS and no REST API to speak of.
  */
+/**
+ * The only parameters this module will ever write.
+ *
+ * A denylist was the first instinct and the wrong shape. The receiver defines
+ * 290 parameters, accepts writes to any of them without authentication, and its
+ * own guard (`check_for_invalid_setting_attempt`) is inherited from a different
+ * Vislink product and does nothing here. A list of forbidden names therefore
+ * permits everything nobody thought of — and something had indeed not been
+ * thought of: `DB_DECOD_COMMAND` offers a `Reboot` option, reaching exactly what
+ * blocking `DB_L2174_REBOOT` was meant to prevent. `DB_IP_ADDRESS` is worse than
+ * a reboot; a reboot comes back.
+ *
+ * Inverted, the failure mode inverts with it: a parameter nobody listed is
+ * refused instead of obeyed. Adding one is then a deliberate act.
+ *
+ * Names are matched trimmed and upper-cased, so a stray space cannot slip past.
+ *
+ * What is absent is absent on purpose: restoring defaults wipes the
+ * configuration, licence and key entry can break the licensing, and
+ * `DB_IP_ADDRESS` takes the receiver off the network in a way only someone
+ * standing in front of it can undo. None of those belong on a button, so they
+ * are simply not listed — which under an allowlist is all it takes.
+ */
+export const SAFE_PARAMETERS: ReadonlySet<string> = new Set([
+	'DB_L2174_FREQ1',
+	'DB_L2174_CHAN_BW',
+	'DB_L2174_RX_MODE',
+	'DB_DEMOD_ASI1_OUTPUT_MUX',
+	'DB_L2174_DEMOD_DIVERSITY',
+	'DB_L2174_WEB_TEXT',
+])
+
+/**
+ * Writes that interrupt the receiver, available only while the connection's
+ * "guarded actions" switch is on.
+ *
+ * Recalling a preset reconfigures the whole receiver at once and a reboot takes
+ * it off air for a minute — both are legitimate remote-hands operations and both
+ * are the wrong thing to hit by accident mid-show. The switch is off by default,
+ * and while it is off these actions are not offered at all rather than offered
+ * and ignored.
+ */
+export const GUARDED_PARAMETERS: ReadonlySet<string> = new Set([
+	'DB_L2174_PRESET_NUM',
+	'DB_L2174_PRESET_RECALL',
+	'DB_L2174_PRESET_STORE',
+	'DB_L2174_REBOOT',
+])
+
 export class LynxApi {
 	#options: LynxApiOptions
 	#log: ApiLogger
@@ -105,6 +188,27 @@ export class LynxApi {
 	}
 
 	/** GET `/data.xml` and return it parsed into a flat name → value map. */
+	/**
+	 * Set one parameter.
+	 *
+	 * The receiver's write path is a GET with a query string — the same shape as
+	 * a read, which is precisely why the refusal above sits here rather than
+	 * being left to callers to remember.
+	 */
+	async setParameter(name: string, value: string): Promise<void> {
+		const key = name.trim().toUpperCase()
+		if (!SAFE_PARAMETERS.has(key)) {
+			if (!GUARDED_PARAMETERS.has(key)) {
+				throw new Error(`Refusing to write ${name}: not one of the parameters this module may change`)
+			}
+			if (!this.#options.allowGuardedWrites) {
+				throw new Error(`Refusing to write ${name}: enable "guarded actions" in the connection config first`)
+			}
+		}
+		const path = `/common/iframe.php?param=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`
+		await this.#get(path)
+	}
+
 	async getParameters(): Promise<RawParameters> {
 		const body = await this.#get('/data.xml')
 		return parseParameters(body)

@@ -1,2 +1,5 @@
 package.json
 /LICENSE.md
+fixtures/
+# Hand-formatted; prettier collapses its arrays into noise
+companion/manifest.json

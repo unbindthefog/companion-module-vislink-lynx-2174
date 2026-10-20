@@ -4,18 +4,26 @@ Monitors a Vislink Lynx L2174 RF broadcast receiver through its built-in
 `data.xml` status page and exposes the receiver's state as Companion variables
 and feedbacks.
 
-**This module is read-only.** It polls status and never writes to the
-receiver, so it cannot change frequency, presets or any other setting. Adding
-actions is planned, but only after the write path has been validated against a
-lab receiver — see `ROADMAP.md`.
+**What it may change.** The module reads freely and writes only the six
+parameters its actions need — frequency, bandwidth, receive mode, decoder
+source, diversity and the display name. Everything else the receiver would
+accept is refused in the client itself, so a mistake cannot reach it. Preset
+recall, preset store and reboot interrupt reception and are hidden until you
+switch them on per connection (see Configuration).
+
+The receiver has no authentication: anything that can reach it on the network
+can reconfigure it. That is a property of the device, not of this module, and
+it is the reason the list of writable parameters is a short allowlist rather
+than a list of things to avoid.
 
 ## Configuration
 
-| Field            | Notes                                                                                                       |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| Receiver address | IP address or hostname of the L2174.                                                                        |
-| Port             | Normally `80`.                                                                                              |
-| Poll interval    | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second. |
+| Field                | Notes                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Receiver address     | IP address or hostname of the L2174.                                                                        |
+| Port                 | Normally `80`.                                                                                              |
+| Poll interval        | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second. |
+| Interrupting actions | Off by default. While off, preset recall, preset store and reboot are not offered at all.                   |
 
 There is nothing to configure about the transport — the receiver serves
 `data.xml` over plain HTTP with no authentication.
@@ -145,6 +153,34 @@ is crossed.
 
 Presets are a starting point — thresholds, colours and text are all yours to
 edit once the button is on the page.
+
+## Actions
+
+| Action                        | Effect                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Set receive frequency**     | Retunes the demodulator. The link drops until the transmitter matches.                                                          |
+| **Set channel bandwidth**     | 3–12 MHz. Takes up to three seconds to apply.                                                                                   |
+| **Set receive mode**          | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                         |
+| **Set decoder source**        | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                      |
+| **Set demodulator diversity** | On or off.                                                                                                                      |
+| **Set web ID**                | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered. |
+
+With **interrupting actions** switched on, three more appear:
+
+| Action              | Effect                                                                                |
+| ------------------- | ------------------------------------------------------------------------------------- |
+| **Recall preset**   | Loads a stored configuration — frequency, bandwidth, mode and routing change at once. |
+| **Store preset**    | Overwrites the chosen slot with the current settings. The previous contents are gone. |
+| **Reboot receiver** | Off air for about a minute.                                                           |
+
+Switching the setting back off removes them from the list again, but a button
+that already carries one keeps it and goes quiet: pressing it does nothing
+until the setting is on again. Nothing on the button says so — worth knowing
+before wondering why it stopped working.
+
+Writes are read back. The receiver answers every write with `200` even when it
+discards the value, so the module polls again afterwards and logs a warning if
+the parameter still does not read what was set.
 
 ## Polling and load on the receiver
 

@@ -114,7 +114,7 @@ Server: lighttpd/1.4.15
 </parameter>
 ```
 
-**DTD-Struktur**: `parameter → name, display*, units?, command?, min?, low?, mid?, up?, max?, option*`. Die optionalen `<low>`/`<mid>`/`<up>`-Elemente (Schwellwerte für die Touch-Slider-Darstellung) sind in der aktuellen Firmware bei keinem Parameter befüllt; `<command>` ebenfalls nicht — Schreibzugriffe laufen ausschließlich über `iframe.php` (siehe [Abschnitt 6](#6-schreibzugriff-aus-der-gui-abgeleitet--ungetestet)), nicht über einen in `settings.xml` hinterlegten Befehlsnamen.
+**DTD-Struktur**: `parameter → name, display*, units?, command?, min?, low?, mid?, up?, max?, option*`. Die optionalen `<low>`/`<mid>`/`<up>`-Elemente (Schwellwerte für die Touch-Slider-Darstellung) sind in der aktuellen Firmware bei keinem Parameter befüllt; `<command>` ebenfalls nicht — Schreibzugriffe laufen ausschließlich über `iframe.php` (siehe [Abschnitt 6](#6-schreibzugriff-am-laborger%C3%A4t-verifiziert)), nicht über einen in `settings.xml` hinterlegten Befehlsnamen.
 
 ---
 
@@ -470,9 +470,36 @@ Diese beiden Felder entsprechen 1:1 den GUI-Seiten „DEMOD“ und „DECODER“
 
 ---
 
-## 6. Schreibzugriff (aus der GUI abgeleitet — **ungetestet**)
+## 6. Schreibzugriff (am Laborgerät verifiziert)
 
-> Alles in diesem Abschnitt wurde ausschließlich aus dem JavaScript der Web-GUI (`common/webgui.js`, `common/custom.js`) rekonstruiert. **Es wurde kein einziger Schreibzugriff gegen das Testgerät ausgeführt** — das Gerät ist im Produktiveinsatz. Vor einer echten Nutzung: an einem Ersatzgerät verifizieren.
+> Dieser Abschnitt war zunächst nur aus dem JavaScript der Web-GUI
+> (`common/webgui.js`, `common/custom.js`) rekonstruiert. **Am 20.10.2026 am
+> Laborgerät verifiziert** — Vislink Lynx L2174, Web-ID „Rx Relais",
+> Seriennummer 0324605, Build V1039 / SW 3.04, `10.81.5.149`, nur Strom und
+> Direktverbindung, nichts weiter angeschlossen.
+>
+> Das Protokoll funktioniert wie beschrieben: `GET` auf `iframe.php` mit
+> `param` und `value` antwortet mit `200`, der Wert ändert sich, **ohne
+> Authentifizierung und ohne Session-Cookie** — ein nacktes `curl` genügt.
+>
+> **Einschwingzeit gemessen** (Schreibzugriff bis zur Sichtbarkeit in
+> `data.xml`, Abtastung alle 250 ms):
+>
+> | Parameter           | gemessen      |
+> | ------------------- | ------------- |
+> | `DB_L2174_CHAN_BW`  | 335 … 2982 ms |
+> | `DB_L2174_FREQ1`    | 617 … 874 ms  |
+> | `DB_L2174_WEB_TEXT` | ~850 ms       |
+>
+> Die Spanne spiegelt, wie tief der Parameter ins Gerät greift: Die Web-ID ist
+> ein Anzeigestring, die Bandbreite zwingt den Demodulator zur
+> Neukonfiguration. Wer nach einem Schreibzugriff gegenliest, muss mit bis zu
+> drei Sekunden rechnen — das Modul pollt deshalb zweistufig nach.
+>
+> **Gegen produktive Geräte gilt weiterhin Zurückhaltung**: `iframe.php`
+> antwortet auch dann mit `200`, wenn es den Wert verwirft, und die
+> geräteseitige Prüfung `check_for_invalid_setting_attempt` ist hier inert
+> (siehe unten).
 
 Jedes Set-Formular in der GUI ruft eine von mehreren JS-Funktionen auf, die alle auf dasselbe Muster hinauslaufen: ein `GET` auf `iframe.php`, dessen Antwort in einem unsichtbaren Frame (`setting_frame`) landet und die Seite dadurch nicht neu lädt.
 
