@@ -113,11 +113,14 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       actions, preset recall end to end (30 parameters changed, the receiver
       put the recall trigger back to `No` by itself, the IP address untouched),
       and `DB_DECOD_FREEZE_ON_LOSS` from the new batch
-- [ ] 18 of the 19 new actions are untested on hardware. The downconverter
-      supplies matter most: `DB_L2174_LNB_PWR_1..4` has no GUI page of its own
-      (`docs/LYNX_L2174_API.md` §4), so whether the receiver accepts the write
-      at all is unproven. The read-back would say so honestly, but it has not
-      been tried
+- [x] Downconverter power verified on the lab unit (2026-10-20, nothing on the
+      coax): `DB_L2174_LNB_PWR_1` set to `On` from a button and read back, then
+      back to `Off`. No LNB Fault alarm either way, and the channel's current
+      reading did not move — expected with no load. So the parameter is
+      writable despite having no GUI page of its own
+- [ ] 17 of the 19 new actions are still untested on hardware. None of them
+      changes anything a read-back would not report, so this is a test gap
+      rather than a risk
 
 Deliberately left out: AES/BISS/EBS key material, licence entry,
 `DB_RESTORE_DEFAULTS` and the descrambling type (all refused in `api.ts`);

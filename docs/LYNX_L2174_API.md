@@ -677,3 +677,20 @@ vollen Wertemengen führen und sich auf das Zurücklesen verlassen.
 `DB_DEMOD_RX_MODE` (der Messwert) schreibt denselben Modus als `DVB-T`. Wer
 einen gesetzten Wert gegenliest, muss denselben Parameter lesen, den er
 geschrieben hat.
+
+### Downconverter-Speisung ist schreibbar, ohne eigene GUI-Seite
+
+`DB_L2174_LNB_PWR_1..4` steht in Abschnitt 4 unter den verborgenen Parametern —
+es gibt keine Seite, auf der die Weboberfläche sie zeigt. Schreibbar ist sie
+trotzdem: am Laborgerät (20.10.2026, nichts am Koax) mit
+`iframe.php?param=DB_L2174_LNB_PWR_1&value=On` gesetzt und in `data.xml`
+zurückgelesen, anschließend wieder auf `Off`.
+
+Beobachtet dabei:
+
+- `DB_L2174_ALARMS` Bit 10 (`LNB Fault`) blieb in beiden Richtungen `0`. Ohne
+  angeschlossenen Downconverter meldet das Gerät also **keinen** Fehler — die
+  fehlende Last allein löst den Alarm nicht aus.
+- `DB_DEMOD_CURRENT_1` blieb unverändert bei `017`. Der Wert taugt damit nicht
+  als Nachweis, dass die Speisung an ist; dafür ist `DB_L2174_LNB_PWR_n` selbst
+  die einzige Quelle.
