@@ -394,7 +394,9 @@ export function UpdatePresets(self: ModuleInstance): void {
 			name: `Recall preset ${slot} (interrupts)`,
 			keywords: ['preset', 'recall', 'memory', `${slot}`],
 			style: { ...READOUT_STYLE, text: `PRESET\n${slot}`, size: '14' },
-			feedbacks: [unknownCover('unit')],
+			// No grey cover, for the same reason as store below: there is no
+			// reading on this button to be uncertain about.
+			feedbacks: [],
 			steps: [{ down: [{ actionId: 'recall_preset', options: { preset: slot } }], up: [] }],
 		}
 
@@ -408,7 +410,12 @@ export function UpdatePresets(self: ModuleInstance): void {
 			name: `Store preset ${slot} (overwrites)`,
 			keywords: ['preset', 'store', 'save', 'overwrite', `${slot}`],
 			style: { ...DESTRUCTIVE_STYLE, text: `STORE\n${slot}`, size: '14' },
-			feedbacks: [unknownCover('unit')],
+			// No grey cover here, unlike every other button. Grey means "we do not
+			// know this reading" — but there is no reading on a store button, and
+			// between Companion starting and the first good poll the cover would
+			// turn STORE and RECALL the same colour while a press still reaches
+			// the receiver. The red is what keeps two rows of sixteen apart.
+			feedbacks: [],
 			steps: [{ down: [{ actionId: 'store_preset', options: { preset: slot } }], up: [] }],
 		}
 	}
@@ -421,7 +428,8 @@ export function UpdatePresets(self: ModuleInstance): void {
 			name: 'Reboot receiver (off air ~1 min)',
 			keywords: ['reboot', 'restart', 'power'],
 			style: { ...DESTRUCTIVE_STYLE, text: 'REBOOT', size: '14' },
-			feedbacks: [unknownCover('unit')],
+			// Red stays red, for the same reason as store above.
+			feedbacks: [],
 			steps: [{ down: [{ actionId: 'reboot_receiver', options: {} }], up: [] }],
 		}
 	}

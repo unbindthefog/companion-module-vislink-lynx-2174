@@ -158,13 +158,16 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		const api = this.#api
 		if (!api) throw new Error('Not connected to a receiver')
 
-		this.log('info', `Setting ${name} = ${value}`)
 		// Which receiver this write is going to. The request below can be in
 		// flight for up to the socket timeout, and the connection can be pointed
 		// somewhere else in the meantime — in which case there is nothing left to
 		// read this value back from, and the pending check must not be created.
 		const target = this.#connectedTo
+		// Logged after the fact, not before: `setParameter` refuses anything
+		// outside the allowlist, and a line saying "Setting X = Y" above that
+		// refusal would claim an effect that never happened.
 		await api.setParameter(name, value)
+		this.log('info', `Setting ${name} = ${value}`)
 		if (this.#connectedTo !== target) {
 			this.log('warn', `${name} was set on a receiver this connection no longer points at; not checking it`)
 			return
@@ -179,12 +182,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			// iframe.php answers 200 even when it discards the value, so the only
 			// honest confirmation is reading it back. Say so when it did not take,
 			// rather than leaving someone to press the button a second time.
-			const timer = setTimeout(() => {
-				this.#pendingWrites.delete(name)
-				this.log('warn', `${name} still does not read ${JSON.stringify(value)} — the receiver may have rejected it`)
-			}, 4500)
-			timer.unref?.()
-			this.#pendingWrites.set(name, { value, timer })
+			this.#armVerifyTimer(name, value, true)
 		}
 
 		// Measured on the bench: the receiver takes between 0.3 s and 3 s to
@@ -194,6 +192,73 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// the later one catches whatever had not settled yet.
 		setTimeout(() => void this.#poll(), 1200)
 		setTimeout(() => void this.#poll(), 3500)
+	}
+
+	/**
+	 * Arm the "did that take?" warning for one parameter.
+	 *
+	 * The settling times measured on the bench run to 3 s, and a poll can be in
+	 * flight for longer than that again. Firing the warning while the answer is
+	 * still on its way would accuse the receiver of rejecting a write it
+	 * accepted — and the warning cannot be taken back once logged. So when a
+	 * poll is running, give it one more round before saying anything.
+	 */
+	#armVerifyTimer(name: string, value: string, mayRetry: boolean): void {
+		const timer = setTimeout(() => {
+			this.#pendingWrites.delete(name)
+			if (mayRetry && this.#isPolling) {
+				this.#armVerifyTimer(name, value, false)
+				return
+			}
+			this.log('warn', `${name} still does not read ${JSON.stringify(value)} — the receiver may have rejected it`)
+		}, 4500)
+		timer.unref?.()
+		this.#pendingWrites.set(name, { value, timer })
+	}
+
+	/**
+	 * Write a value and wait until the receiver reports it back.
+	 *
+	 * For the two-step actions, where the second step acts on whatever the first
+	 * one selected. `iframe.php` answers 200 even when it discards the value, so
+	 * "the request went through" is not an answer to "is the right slot
+	 * selected" — and storing into the wrong slot cannot be undone.
+	 */
+	async writeAndConfirm(
+		name: string,
+		value: string,
+		matches: (reading: string | undefined) => boolean = (reading) => reading === value,
+		timeoutMs = 4000,
+	): Promise<boolean> {
+		// No verify timer: the loop below is the better check, and arming both
+		// would warn twice about one rejected write — the second time long after
+		// the caller has already said what happened.
+		await this.writeParameter(name, value, false)
+
+		const api = this.#api
+		if (!api) return false
+		const target = this.#connectedTo
+		const deadline = Date.now() + timeoutMs
+
+		// The receiver republishes data.xml on its own one-second timer, so there
+		// is nothing to gain from asking faster than that.
+		while (Date.now() < deadline) {
+			await new Promise((resolve) => setTimeout(resolve, 900))
+			if (this.#connectedTo !== target) return false
+			try {
+				const params = await api.getParameters()
+				// Checked again on this side of the await: a read can be in flight
+				// while the connection is pointed elsewhere, and an answer from the
+				// old receiver must not confirm a write for the new one.
+				if (this.#connectedTo !== target) return false
+				if (matches(params[name])) return true
+			} catch {
+				// A failed read here is not an answer either way; the loop simply
+				// runs out of time and the caller stops.
+			}
+		}
+
+		return false
 	}
 
 	/** Stop waiting on one parameter, without touching the others. */

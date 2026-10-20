@@ -120,7 +120,8 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       writable despite having no GUI page of its own
 - [ ] 17 of the 19 new actions are still untested on hardware. None of them
       changes anything a read-back would not report, so this is a test gap
-      rather than a risk
+      rather than a risk. `docs/HARDWARE_TESTS.md` says what each one needs —
+      signal, a downconverter, a monitor or a reference — and in what order
 
 Deliberately left out: AES/BISS/EBS key material, licence entry,
 `DB_RESTORE_DEFAULTS` and the descrambling type (all refused in `api.ts`);
@@ -142,7 +143,7 @@ Still open on the control side:
       use different words for the same mode (`DVBT` against `DVB-T`). `rx_mode`
       is now the setting; `rx_mode_detected` is the demodulator's readout
 - [ ] Dropdown values are the full sets, hardcoded from `settings.xml`. The
-      device also publishes which of them are selectable *right now*
+      device also publishes which of them are selectable _right now_
       (`enabled="yes|no"`, and it changes with the receive mode), so the lists
       could be built per connection instead. Bigger change: `settings.xml` would
       have to be fetched and the action definitions rebuilt on connect

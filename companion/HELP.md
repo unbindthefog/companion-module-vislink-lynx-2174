@@ -47,35 +47,79 @@ There is nothing to configure about the transport — the receiver serves
 
 ### RF / demodulator
 
-| Variable               | Example              |
-| ---------------------- | -------------------- |
-| `rx_mode`              | `LMST(S)`            |
-| `rf_frequency`         | `2.325000`           |
-| `rf_bandwidth`         | `10MHz`              |
-| `rf_modulation`        | `16QAM`              |
-| `rf_fec`               | `2/3`                |
-| `rf_guard_interval`    | `Auto`               |
-| `pre_ber` / `post_ber` | `0`                  |
-| `asi_input_lock`       | `Locked` / `No Lock` |
-| `ip_input_lock`        | `Locked` / `No Lock` |
+| Variable               | Example              | Notes                                          |
+| ---------------------- | -------------------- | ---------------------------------------------- |
+| `rx_mode`              | `LMST(S)`            | the mode as **set** — `DVBT`, not `DVB-T`      |
+| `rx_mode_detected`     | `DVB-T`              | the same mode as the demodulator reports it    |
+| `rf_frequency`         | `2.325000`           |                                                |
+| `rf_bandwidth`         | `10MHz`              |                                                |
+| `rf_modulation`        | `16QAM`              | read-only on this receiver, taken from the TPS |
+| `rf_fec`               | `2/3`                | read-only, likewise                            |
+| `rf_guard_interval`    | `Auto`               |                                                |
+| `spectral_polarity`    | `Normal`             |                                                |
+| `pre_ber` / `post_ber` | `0`                  |                                                |
+| `asi_input_lock`       | `Locked` / `No Lock` |                                                |
+| `ip_input_lock`        | `Locked` / `No Lock` |                                                |
+| `preset_slot`          | `001`                | the slot **selected**, not the one in force    |
+
+The receiver spells its receive mode two different ways, and the difference
+matters when you compare one against a value you typed: `rx_mode` is what the
+mode is set to and what the action writes, `rx_mode_detected` is the
+demodulator's own readout.
+
+### Routing
+
+| Variable            | Example                                        |
+| ------------------- | ---------------------------------------------- |
+| `decoder_source`    | `Ext ASI` / `Demodulator` / `Diversity` / `IP` |
+| `asi_output_source` | same set                                       |
+| `ip_output_source`  | same set, plus `Off`                           |
+| `demod_diversity`   | `On` / `Off`                                   |
+| `asi_diversity`     | `On` / `Off`                                   |
+| `diversity_delay`   | `Auto` / `Off`                                 |
 
 ### Per-channel signal quality
 
-The receiver has four RF input channels. For each there are three variables:
+The receiver has four RF input channels. For each:
 
 - `channel1_lock` … `channel4_lock` — `Locked` / `No Lock`
 - `channel1_power` … `channel4_power` — input power level in dBm
 - `channel1_mer` … `channel4_mer` — modulation error ratio in dB
+- `channel1_enabled` … `channel4_enabled` — whether it joins the combination
+- `channel1_lnb_power` … `channel4_lnb_power` — downconverter supply, `On` / `Off`
+
+`channelN_lnb_power` says the supply is switched on, not that voltage reached
+anything: with nothing on the coax the receiver reports no current and raises no
+LNB fault, so there is no second reading to confirm it against.
 
 ### Decoder and camera control
 
-| Variable        | Example              |
-| --------------- | -------------------- |
-| `video_locked`  | `Locked` / `No Lock` |
-| `video_format`  | `1080I/50`           |
-| `audio1_locked` | `Locked` / `No Lock` |
-| `audio2_locked` | `Locked` / `No Lock` |
-| `ccu_status`    | `Not Detected`       |
+| Variable             | Example                           |
+| -------------------- | --------------------------------- |
+| `video_locked`       | `Locked` / `No Lock`              |
+| `video_format`       | `1080I/50`                        |
+| `video_input_mode`   | `H264` — the codec it expects     |
+| `genlock`            | `Off` / `SD` / `HD`               |
+| `genlock_error`      | `OK` / `Fail`                     |
+| `freeze_on_loss`     | `Freeze` / `Blue`                 |
+| `video_output_1`     | `SDI` / `SDI+Overlay`             |
+| `video_output_2`     | same, plus the composite variants |
+| `overlay_type`       | `Basic` / `Service`               |
+| `overlay_background` | `Off`, or `10`–`100`              |
+| `overlay_colour`     | `White` / `Green`                 |
+| `audio1_locked`      | `Locked` / `No Lock`              |
+| `audio2_locked`      | `Locked` / `No Lock`              |
+| `ccu_status`         | `Not Detected`                    |
+
+### Status pin
+
+| Variable                 | Example            |
+| ------------------------ | ------------------ |
+| `status_pin_mode`        | `Alarm` / `Manual` |
+| `status_pin_alarm_level` | `High` / `Low`     |
+
+The pin's current level has no variable: the receiver accepts a write to it but
+does not publish it in `data.xml`, so there is nothing to read back.
 
 ### Alarms
 
@@ -136,18 +180,19 @@ surely as too little. Its preset stacks four feedbacks: green from −6 to
 
 ## Presets
 
-The module ships 146 ready-made buttons you can drag straight onto a page.
+The module ships 105 ready-made buttons you can drag straight onto a page, or
+146 with the interrupting actions switched on.
 Monitoring first, then one button per value for everything the actions can set:
 
-| Section               | Buttons                                                                           |
-| --------------------- | --------------------------------------------------------------------------------- |
-| **Signal**            | RF lock plus power and MER as traffic lights — one of each per channel (1–4)      |
-| **Decoder**           | Video lock, detected video format, audio 1 + 2 lock                               |
-| **Control — RF**      | Receive mode, bandwidth, guard interval, polarity, channel enable, retune         |
-| **Control — Routing** | Decoder source, ASI and IP output source, the three diversity inputs, delay       |
-| **Control — Video**   | Video input mode, genlock, on-signal-loss, both output formats, the overlay       |
-| **Control — Unit**    | Status pin mode, state and alarm level                                            |
-| **Unit**              | Alarm status, camera battery, the three temperatures, and unit identity           |
+| Section               | Buttons                                                                      |
+| --------------------- | ---------------------------------------------------------------------------- |
+| **Signal**            | RF lock plus power and MER as traffic lights — one of each per channel (1–4) |
+| **Decoder**           | Video lock, detected video format, audio 1 + 2 lock                          |
+| **Control — RF**      | Receive mode, bandwidth, guard interval, polarity, channel enable, retune    |
+| **Control — Routing** | Decoder source, ASI and IP output source, the three diversity inputs, delay  |
+| **Control — Video**   | Video input mode, genlock, on-signal-loss, both output formats, the overlay  |
+| **Control — Unit**    | Status pin mode, state and alarm level                                       |
+| **Unit**              | Alarm status, camera battery, the three temperatures, and unit identity      |
 
 With **interrupting actions** on, Control — RF gains downconverter power per
 channel, and Control — Unit gains recall and store for all 16 preset slots plus
@@ -158,10 +203,10 @@ switched on — put all four channels in one group rather than one group each.
 The channel is on the button itself (`RF1`…`RF4`, `LNB1`…`LNB4`).
 
 **Control buttons show what is set, not just what they would do.** Each carries
-a *setting is* feedback and turns green while the receiver already holds that
+a _setting is_ feedback and turns green while the receiver already holds that
 value, so a row of them reads at a glance as "this is the one we are on". Three
 kinds stay dark on purpose: preset recall, because the receiver only reports
-which slot is *selected* and not which one is still in force; the status pin
+which slot is _selected_ and not which one is still in force; the status pin
 state, which the receiver does not report at all; and store and reboot, which
 are red instead, because neither can be taken back.
 
@@ -180,7 +225,7 @@ edit once the button is on the page.
 | Action                        | Effect                                                                                                                          |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **Set receive frequency**     | Retunes the demodulator. The link drops until the transmitter matches.                                                          |
-| **Set channel bandwidth**     | 3–12 MHz. Takes up to three seconds to apply.                                                                                   |
+| **Set channel bandwidth**     | `2MHz`–`12MHz`, or `Auto`. Takes up to three seconds to apply — the slowest write on the unit.                                  |
 | **Set receive mode**          | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                         |
 | **Set decoder source**        | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                      |
 | **Set demodulator diversity** | On or off.                                                                                                                      |
@@ -205,11 +250,11 @@ edit once the button is on the page.
 
 With **interrupting actions** switched on, four more appear:
 
-| Action                     | Effect                                                                                                     |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Recall preset**          | Loads a stored configuration — frequency, bandwidth, mode and routing change at once.                      |
-| **Store preset**           | Overwrites the chosen slot with the current settings. The previous contents are gone.                      |
-| **Reboot receiver**        | Off air for about a minute.                                                                                |
+| Action                      | Effect                                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Recall preset**           | Loads a stored configuration — frequency, bandwidth, mode and routing change at once.                       |
+| **Store preset**            | Overwrites the chosen slot with the current settings. The previous contents are gone.                       |
+| **Reboot receiver**         | Off air for about a minute.                                                                                 |
 | **Set downconverter power** | Puts DC on an antenna input (1–4) to feed a downconverter. Whatever is on the far end of that coax gets it. |
 
 Switching the setting back off removes them from the list again, but a button

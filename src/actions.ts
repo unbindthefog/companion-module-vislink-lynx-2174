@@ -139,10 +139,10 @@ export function UpdateActions(self: ModuleInstance): void {
 	/**
 	 * Every action funnels through here, so logging stays in one place.
 	 *
-	 * Returns whether it worked. That matters for the two-step preset actions: a
-	 * catch that only logs makes a failure invisible to the caller, and a chain
-	 * that carries on regardless would trigger the slot the receiver happens to
-	 * have selected — overwriting the wrong preset, in the case of store.
+	 * Returns whether the request went out without an error. Note what that is
+	 * not: `iframe.php` answers 200 to anything, so this says the receiver was
+	 * reached, not that it kept the value. Where that difference matters — the
+	 * two-step preset actions — use `selectPresetSlot()` below instead.
 	 */
 	const write = async (name: string, value: string, verify = true): Promise<boolean> => {
 		try {
@@ -228,11 +228,10 @@ export function UpdateActions(self: ModuleInstance): void {
 						'Loads a stored configuration — frequency, bandwidth, mode and routing all change at once, and the link drops while the receiver re-acquires.',
 					options: [presetNumber()],
 					callback: async (action) => {
-						const slot = presetSlot(self, action.options.preset)
-						if (slot === undefined) return
 						// Two steps, the order the receiver's own interface uses: select
-						// the slot, then trigger the recall.
-						if (!(await write('DB_L2174_PRESET_NUM', slot))) return
+						// the slot, then trigger the recall. The trigger acts on whatever
+						// slot is selected, so the first step has to be confirmed.
+						if (!(await selectPresetSlot(self, action.options.preset))) return
 						// 'Yes' is a momentary trigger: the receiver acts and drops the
 						// parameter back to 'No', so there is nothing to read back.
 						await write('DB_L2174_PRESET_RECALL', 'Yes', false)
@@ -247,9 +246,7 @@ export function UpdateActions(self: ModuleInstance): void {
 						'Overwrites the chosen slot with the receiver\u2019s current settings. The previous contents are gone.',
 					options: [presetNumber()],
 					callback: async (action) => {
-						const slot = presetSlot(self, action.options.preset)
-						if (slot === undefined) return
-						if (!(await write('DB_L2174_PRESET_NUM', slot))) return
+						if (!(await selectPresetSlot(self, action.options.preset))) return
 						await write('DB_L2174_PRESET_STORE', 'Yes', false)
 					},
 				}
@@ -281,6 +278,36 @@ function presetNumber() {
 		step: 1,
 		clampValues: true,
 	}
+}
+
+/**
+ * Select a preset slot and wait until the receiver says it is selected.
+ *
+ * The second half of both preset actions triggers whatever slot is currently
+ * chosen. A write that merely left the building is not enough to know which one
+ * that is: the receiver answers 200 and may still be on the old slot, and in
+ * the case of store the next step would then overwrite it for good.
+ */
+async function selectPresetSlot(self: ModuleInstance, raw: unknown): Promise<boolean> {
+	const slot = presetSlot(self, raw)
+	if (slot === undefined) return false
+
+	try {
+		// Compared as a number, not as text. The receiver reported the selected
+		// slot zero-padded to three digits on the bench ('001'), and that is what
+		// is written — but the whole chain now hangs on the read-back matching,
+		// and a receiver that answered '1' would leave both preset actions
+		// permanently silent. A number is a number whichever way it is spelled.
+		const sameSlot = (reading: string | undefined) =>
+			reading !== undefined && reading.trim() !== '' && Number(reading) === Number(slot)
+		if (await self.writeAndConfirm('DB_L2174_PRESET_NUM', slot, sameSlot)) return true
+	} catch (e) {
+		self.log('error', `Could not select preset ${slot}: ${e instanceof Error ? e.message : String(e)}`)
+		return false
+	}
+
+	self.log('warn', `Preset ${slot} is not the slot the receiver has selected — not touching it`)
+	return false
 }
 
 function presetSlot(self: ModuleInstance, raw: unknown): string | undefined {

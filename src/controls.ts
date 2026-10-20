@@ -543,8 +543,9 @@ export function driftedControlIds(): string[] {
  */
 /**
  * Readable settings that no action sets, but a hand-built feedback may still
- * want to match on. `preset` was in the dropdown before the recall buttons
- * dropped their green, and buttons saved then still carry it.
+ * want to match on. The recall buttons deliberately carry no green of their
+ * own — the receiver only reports which slot is *selected* — but the reading
+ * exists, so anyone who wants that comparison can still have it.
  */
 const MATCH_ONLY_SOURCES = [{ id: 'preset', label: 'Selected preset slot', variable: 'preset_slot' }]
 

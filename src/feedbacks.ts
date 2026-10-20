@@ -330,7 +330,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			name: 'Reading is unknown (grey)',
 			type: 'boolean',
 			description:
-				'Grey while this reading cannot be judged — no contact with the receiver yet, no route to it from this machine, or nothing for the channel to measure. Stack it last on a monitoring button so it covers whatever the thresholds below it decided; a value we do not have is not a value that is fine, and it is not a fault either.',
+				'Grey while this reading cannot be judged — no contact with the receiver yet, or no route to it from this machine. Stack it last on a monitoring button so it covers whatever the thresholds below it decided; a value we do not have is not a value that is fine, and it is not a fault either. The choice below is carried for a future that tells channels apart; today every setting behaves the same.',
 			defaultStyle: UNKNOWN_STYLE,
 			options: [
 				{

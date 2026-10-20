@@ -169,19 +169,19 @@ Die 290 Parameter verteilen sich auf 8 sichtbare GUI-Tabs (Top-Nav `ROUTING…UN
 
 **Zweck**: RF-Empfangsparameter — Frequenz, Modulation, Bandbreite, FEC.
 
-| Parameter            | Label          | Wertebereich                      | Live-Wert (Beispiel) |
-| -------------------- | -------------- | --------------------------------- | -------------------- |
-| `DB_L2174_FREQ1`     | Frequency      | 0.0068–10.00 GHz                  | `2.325000`           |
-| `DB_L2174_RX_MODE`   | Mode           | `DVBT`, `LMST(S)`, `LMST(D)`      | `LMST(S)`            |
-| `DB_DEMOD_RX_MODE`   | Mode (Messwert) | `None`, `DVB-T`, `LMST(S)`, `LMST(D)` | `DVB-T`         |
-| `DB_L2174_CHAN_BW`   | Bandwidth      | `2MHz`…`12MHz` (9 Stufen) + `Auto` | `10MHz`             |
-| `DB_DEMOD_MOD_TYPE`  | Mode           | `QPSK`, `16QAM`, `64QAM`          | `16QAM`              |
-| `DB_DEMOD_FEC_RATE`  | FEC Rate       | `1/2`, `2/3`, `3/4`, `5/6`, `7/8` | `2/3`                |
-| `DB_DEMOD_GUARD_INT` | Guard Interval | `1/32`, `1/16`, `1/8`, `1/4`, `Auto` | `Auto`            |
-| `DB_DEMOD_SPEC_POL`  | Polarity       | `Normal`, `Inverted`, `Auto`      | `Normal`             |
-| `DB_DEMOD_TRIAX_EN`  | Triax Mode     | `Off`, `Single`, `Dual`           | `Off`                |
-| `DB_DEMOD_FEC_LOCK`  | FEC Lock       | `No Lock`, `Locked`               | `Locked`             |
-| `DB_DEMOD_TPS_LOCK`  | TPS Lock       | `No Lock`, `Locked`               | `Locked`             |
+| Parameter            | Label           | Wertebereich                          | Live-Wert (Beispiel) |
+| -------------------- | --------------- | ------------------------------------- | -------------------- |
+| `DB_L2174_FREQ1`     | Frequency       | 0.0068–10.00 GHz                      | `2.325000`           |
+| `DB_L2174_RX_MODE`   | Mode            | `DVBT`, `LMST(S)`, `LMST(D)`          | `LMST(S)`            |
+| `DB_DEMOD_RX_MODE`   | Mode (Messwert) | `None`, `DVB-T`, `LMST(S)`, `LMST(D)` | `DVB-T`              |
+| `DB_L2174_CHAN_BW`   | Bandwidth       | `2MHz`…`12MHz` (9 Stufen) + `Auto`    | `10MHz`              |
+| `DB_DEMOD_MOD_TYPE`  | Mode            | `QPSK`, `16QAM`, `64QAM`              | `16QAM`              |
+| `DB_DEMOD_FEC_RATE`  | FEC Rate        | `1/2`, `2/3`, `3/4`, `5/6`, `7/8`     | `2/3`                |
+| `DB_DEMOD_GUARD_INT` | Guard Interval  | `1/32`, `1/16`, `1/8`, `1/4`, `Auto`  | `Auto`               |
+| `DB_DEMOD_SPEC_POL`  | Polarity        | `Normal`, `Inverted`, `Auto`          | `Normal`             |
+| `DB_DEMOD_TRIAX_EN`  | Triax Mode      | `Off`, `Single`, `Dual`               | `Off`                |
+| `DB_DEMOD_FEC_LOCK`  | FEC Lock        | `No Lock`, `Locked`                   | `Locked`             |
+| `DB_DEMOD_TPS_LOCK`  | TPS Lock        | `No Lock`, `Locked`                   | `Locked`             |
 
 **Verborgene Detailfelder (nicht in der GUI, aber in `data.xml`)** — pro Empfangskanal 1–4:
 
@@ -632,7 +632,6 @@ Bemerkenswert: **L2174 ist die einzige der drei Plattformen mit eingebauter Selb
 **Firmware**: Unit Build V1039, Unit Sw Version 3.04, Kernel 1.05
 **Status**: Read-only untersucht & dokumentiert — **kein Schreibzugriff getestet** (Produktivgerät)
 
-
 ---
 
 ## 12. Nachtrag: schreibbare Parameter, am Laborgerät ausgezählt
@@ -694,3 +693,16 @@ Beobachtet dabei:
 - `DB_DEMOD_CURRENT_1` blieb unverändert bei `017`. Der Wert taugt damit nicht
   als Nachweis, dass die Speisung an ist; dafür ist `DB_L2174_LNB_PWR_n` selbst
   die einzige Quelle.
+
+### Rückleseformat von `DB_L2174_PRESET_NUM`
+
+Am Laborgerät meldete `data.xml` den ausgewählten Slot **dreistellig genullt**:
+`001`. Geschrieben wird er im selben Format (`iframe.php?param=…&value=001`),
+und in dieser Schreibweise hat das Gerät ihn angenommen.
+
+Beobachtet wurde allerdings nur Slot 1. Ob das Gerät bei zweistelligen Slots
+`010` oder `10` meldet, ist offen — deshalb vergleicht
+`selectPresetSlot()` in `src/actions.ts` **numerisch** und nicht zeichenweise.
+Die Begründung ist die Tragweite: seit dieser Vergleich darüber entscheidet, ob
+Preset-Recall und -Store überhaupt auslösen, würde eine abweichende Schreibweise
+beide Actions dauerhaft stummschalten, mit einer einzigen Warnzeile als Hinweis.

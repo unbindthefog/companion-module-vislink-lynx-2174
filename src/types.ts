@@ -47,9 +47,16 @@ export const ALARM_BITS = [
 	'Lic type mismatch',
 ] as const
 
-/** The four RF/diversity input channels the L2174 demodulator provides. */
-export const CHANNEL_IDS = [1, 2, 3, 4] as const
-export type ChannelId = (typeof CHANNEL_IDS)[number]
+/**
+ * The four RF/diversity input channels the L2174 demodulator provides.
+ *
+ * Defined once, in `controls.ts`, and re-exported here under the name the
+ * monitoring side has always used. The two lists were identical and separate
+ * for a while, which is how they would have drifted.
+ */
+export { CONTROL_CHANNELS as CHANNEL_IDS } from './controls.js'
+import type { CONTROL_CHANNELS } from './controls.js'
+export type ChannelId = (typeof CONTROL_CHANNELS)[number]
 
 /**
  * The settings a control button can compare itself against now live in
