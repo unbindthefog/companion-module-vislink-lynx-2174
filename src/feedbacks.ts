@@ -1,5 +1,5 @@
 import type ModuleInstance from './main.js'
-import { CHANNEL_IDS } from './types.js'
+import { CHANNEL_IDS, SETTING_SOURCES, type SettingId } from './types.js'
 
 /** Which side of the threshold counts as an alarm. Shared by every threshold feedback. */
 type ThresholdDirection = 'below' | 'above'
@@ -50,6 +50,10 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: { source: string }
 	}
+	setting_is: {
+		type: 'boolean'
+		options: { setting: SettingId; value: string }
+	}
 }
 
 /** Every feedback id, so a poll can re-evaluate the lot without listing them twice. */
@@ -62,6 +66,7 @@ export const ALL_FEEDBACKS = [
 	'temperature_threshold',
 	'voltage_threshold',
 	'reading_unknown',
+	'setting_is',
 ] as const satisfies ReadonlyArray<keyof FeedbacksSchema>
 
 /**
@@ -98,6 +103,27 @@ function readingIsUnknown(state: ModuleInstance['state'], _source: string): bool
 	// left open until it actually gets in the way — `_source` is already carried
 	// through for that day.
 	return state.contact !== 'ok'
+}
+
+/**
+ * Does the receiver currently hold `value` for `setting`?
+ *
+ * `state.settings[setting]` is whatever the last poll read back — the device's
+ * own spelling, e.g. 'LMST(S)', '10MHz', 'On', '001' — or `undefined` when the
+ * receiver did not report it. `value` is what someone typed into the button, or
+ * what a preset put there.
+ *
+ * Two cases are settled and not up for discussion below: nothing read back and
+ * nothing configured both mean "no match", because an empty reading matching an
+ * empty field would paint a button green on the strength of knowing nothing.
+ *
+ * TODO(human): decide how forgiving the comparison itself should be.
+ */
+function settingMatches(state: ModuleInstance['state'], setting: SettingId, value: string): boolean {
+	const reading = state.settings[setting]
+	if (reading === undefined || value === '') return false
+
+	return reading === value
 }
 
 export function UpdateFeedbacks(self: ModuleInstance): void {
@@ -311,6 +337,30 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				},
 			],
 			callback: (feedback) => readingIsUnknown(self.state, feedback.options.source),
+		},
+
+		setting_is: {
+			name: 'Setting is at a given value',
+			type: 'boolean',
+			description:
+				'Green while the receiver already holds this value. Put it on the button that sets it, so the button shows what is selected instead of only what it would do.',
+			defaultStyle: OK_STYLE,
+			options: [
+				{
+					type: 'dropdown',
+					id: 'setting',
+					label: 'Setting',
+					default: 'mode',
+					choices: Object.entries(SETTING_SOURCES).map(([id, source]) => ({ id, label: source.label })),
+				},
+				{
+					type: 'textinput',
+					id: 'value',
+					label: 'Value (as the receiver spells it, e.g. "10MHz", "LMST(S)", "On")',
+					default: '',
+				},
+			],
+			callback: (feedback) => settingMatches(self.state, feedback.options.setting, feedback.options.value),
 		},
 	})
 }

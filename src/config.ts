@@ -61,3 +61,15 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 		},
 	]
 }
+
+/**
+ * Are the interrupting actions on offer for this connection?
+ *
+ * Asked by `actions.ts` (which ones to define) and by `presets.ts` (which ones
+ * to hand out), and those two must never disagree — a preset for an action that
+ * does not exist reaches the button as "unknown action". `config` is undefined
+ * before the first `configUpdated`, and absent means off.
+ */
+export function guardedActionsEnabled(self: { config?: ModuleConfig }): boolean {
+	return self.config?.allowGuardedActions === true
+}

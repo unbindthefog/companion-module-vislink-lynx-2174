@@ -19,7 +19,8 @@ against that same receiver (all 39 variables populate correctly; see the
       power/MER/temperature/voltage threshold — each with a below/above
       direction rather than the comparison baked into the name
 - [x] Load the module into a real Companion instance and verify against the receiver
-- [x] Presets: 21 ready-made buttons in three sections (Signal / Decoder / Unit)
+- [x] Presets: 55 ready-made buttons in four sections (Signal / Decoder /
+      Control / Unit)
 
 ### Verified against real hardware (2026-09-04)
 
@@ -96,16 +97,29 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
 - [x] Verify the pattern above against a lab unit, starting with a harmless,
       easily-reversible parameter (`DB_L2174_WEB_TEXT`) — done 2026-10-20 on
       "Rx Relais" (`10.81.5.149`), see `docs/LYNX_L2174_API.md` §6
-- [ ] Decide which of the 38 GUI-writable parameters are safe and useful as
-      Companion actions
-- [ ] Implement, with confirmation-style presets for anything disruptive
-      (`DB_L2174_REBOOT`, `DB_L2174_PRESET_STORE`/`_RECALL`,
-      `DB_RESTORE_DEFAULTS` — the web UI itself requires a JS confirmation
-      dialog for these)
+- [x] Decide which of the 38 GUI-writable parameters are safe and useful as
+      Companion actions — a two-tier allowlist in `src/api.ts`: six parameters
+      are always writable, four more only with the connection's "interrupting
+      actions" switch, and everything else is refused whatever the switch says
+- [x] Implement — nine actions, and one Control button per value for the four
+      that are a choice rather than a number. Preset recall, preset store and
+      reboot are absent from the action list until the switch is on, rather
+      than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
+      material stay refused outright
+- [x] Verify on the lab unit (`10.81.5.149`, 2026-10-20): every action, and
+      preset recall end to end — 30 parameters changed, the receiver put the
+      recall trigger back to `No` by itself, and the IP address was untouched
 
-Candidate actions, pending the above: frequency/bandwidth/modulation change,
-preset recall, ASI/IP routing change. Whether any of these are safe to expose
-without additional guardrails is unknown until tested on a lab unit.
+Still open on the control side:
+
+- [ ] Decide how forgiving `settingMatches()` should be (`src/feedbacks.ts`
+      carries the `TODO(human)`)
+- [ ] No test setup in this repo at all. A hardware-free test over
+      `buildVariableValues`, `settingMatches` and the preset ids would cover
+      the fiddly parts (`'001'` against `1`, state cleared on contact loss)
+- [ ] `set_rx_mode` writes `DB_L2174_RX_MODE` while the `rx_mode` variable
+      reads `DB_DEMOD_RX_MODE`. The two agreed on the bench unit; nothing
+      guarantees they always will
 
 ## Publishing
 

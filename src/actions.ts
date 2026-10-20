@@ -1,4 +1,5 @@
 import type ModuleInstance from './main.js'
+import { guardedActionsEnabled } from './config.js'
 
 /**
  * What this module will change on the receiver.
@@ -18,11 +19,15 @@ import type ModuleInstance from './main.js'
  * does not.
  */
 
-/** Options the receiver accepts, from docs/LYNX_L2174_API.md §3.2. */
-const BANDWIDTHS = ['3MHz', '4MHz', '5MHz', '6MHz', '7MHz', '8MHz', '10MHz', '12MHz']
-const RX_MODES = ['DVBT', 'LMST(S)', 'LMST(D)']
-const ON_OFF = ['Off', 'On']
-const DECODER_SOURCES = ['Ext ASI', 'Demodulator', 'Diversity', 'IP']
+/**
+ * Options the receiver accepts, from docs/LYNX_L2174_API.md §3.2. Exported so
+ * `presets.ts` builds one button per value from the same list, rather than
+ * keeping a second copy that can drift from the one the actions validate.
+ */
+export const BANDWIDTHS = ['3MHz', '4MHz', '5MHz', '6MHz', '7MHz', '8MHz', '10MHz', '12MHz']
+export const RX_MODES = ['DVBT', 'LMST(S)', 'LMST(D)']
+export const ON_OFF = ['Off', 'On']
+export const DECODER_SOURCES = ['Ext ASI', 'Demodulator', 'Diversity', 'IP']
 
 export type ActionsSchema = {
 	set_frequency: { options: { frequency: number } }
@@ -68,7 +73,7 @@ export function UpdateActions(self: ModuleInstance): void {
 		}
 	}
 
-	const guarded = self.config?.allowGuardedActions === true
+	const guarded = guardedActionsEnabled(self)
 
 	self.setActionDefinitions({
 		set_frequency: {

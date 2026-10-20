@@ -28,6 +28,9 @@ export type VariablesSchema = ChannelVariables & {
 	rf_modulation: string
 	rf_fec: string
 	rf_guard_interval: string
+	decoder_source: string
+	demod_diversity: string
+	preset_slot: string
 	pre_ber: string
 	post_ber: string
 	asi_input_lock: string
@@ -67,6 +70,9 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 		rf_modulation: { name: 'Modulation (QPSK / 16QAM / 64QAM)' },
 		rf_fec: { name: 'Forward error correction rate' },
 		rf_guard_interval: { name: 'Guard interval' },
+		decoder_source: { name: 'Decoder source (Ext ASI / Demodulator / Diversity / IP)' },
+		demod_diversity: { name: 'Demodulator diversity (On / Off)' },
+		preset_slot: { name: 'Selected preset slot (001-016)' },
 		pre_ber: { name: 'Pre-FEC bit error rate' },
 		post_ber: { name: 'Post-FEC bit error rate' },
 		asi_input_lock: { name: 'ASI input lock (Locked / No Lock)' },
@@ -137,6 +143,9 @@ export function buildVariableValues(params: RawParameters): Partial<VariablesSch
 		rf_modulation: str(params.DB_DEMOD_MOD_TYPE),
 		rf_fec: str(params.DB_DEMOD_FEC_RATE),
 		rf_guard_interval: str(params.DB_DEMOD_GUARD_INT),
+		decoder_source: str(params.DB_DEMOD_ASI1_OUTPUT_MUX),
+		demod_diversity: str(params.DB_L2174_DEMOD_DIVERSITY),
+		preset_slot: str(params.DB_L2174_PRESET_NUM),
 		pre_ber: str(params.DB_DEMOD_PRE_BER),
 		post_ber: str(params.DB_DEMOD_POST_BER),
 		asi_input_lock: str(params.DB_DEMOD_ASI_1_LOCK),

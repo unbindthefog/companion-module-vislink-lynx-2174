@@ -50,3 +50,26 @@ export const ALARM_BITS = [
 /** The four RF/diversity input channels the L2174 demodulator provides. */
 export const CHANNEL_IDS = [1, 2, 3, 4] as const
 export type ChannelId = (typeof CHANNEL_IDS)[number]
+
+/**
+ * The settings a control button can compare itself against.
+ *
+ * A button that sets a value should also show whether the receiver is already
+ * holding it — otherwise the only way to tell what is selected is to open the
+ * receiver's own web page. Each entry names the module variable that already
+ * mirrors the setting, rather than the `data.xml` parameter underneath it, so
+ * the mapping from device to module stays in one place (`variables.ts`).
+ *
+ * One wrinkle that costs nothing here: the receiver publishes the receive mode
+ * twice, as `DB_L2174_RX_MODE` (what the action writes) and `DB_DEMOD_RX_MODE`
+ * (what `rx_mode` reads). On the bench unit the two always agreed.
+ */
+export const SETTING_SOURCES = {
+	mode: { label: 'Receive mode', variable: 'rx_mode' },
+	bandwidth: { label: 'Channel bandwidth', variable: 'rf_bandwidth' },
+	source: { label: 'Decoder source', variable: 'decoder_source' },
+	diversity: { label: 'Demodulator diversity', variable: 'demod_diversity' },
+	preset: { label: 'Selected preset slot', variable: 'preset_slot' },
+} as const
+
+export type SettingId = keyof typeof SETTING_SOURCES

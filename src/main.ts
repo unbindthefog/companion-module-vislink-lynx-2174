@@ -11,7 +11,7 @@ import { UpdateActions, type ActionsSchema } from './actions.js'
 import { UpdateFeedbacks, ALL_FEEDBACKS, type FeedbacksSchema } from './feedbacks.js'
 import { UpdatePresets } from './presets.js'
 import { LynxApi, classifyFailure, type ContactFailure } from './api.js'
-import { CHANNEL_IDS } from './types.js'
+import { CHANNEL_IDS, SETTING_SOURCES, type SettingId } from './types.js'
 
 export type ModuleSchema = {
 	config: ModuleConfig
@@ -66,6 +66,11 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		demodTemperature: undefined as number | undefined,
 		decoderTemperature: undefined as number | undefined,
 		cameraBatteryVoltage: undefined as number | undefined,
+		/**
+		 * What the receiver currently has selected, for the control buttons to
+		 * match themselves against. Keyed the way `SETTING_SOURCES` names them.
+		 */
+		settings: {} as Partial<Record<SettingId, string>>,
 	}
 
 	#api: LynxApi | null = null
@@ -104,6 +109,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// The guarded actions appear and disappear with the switch, so the list has
 		// to be rebuilt rather than only reconnected.
 		this.updateActions()
+		// And the presets that hand them out, so the two lists never disagree about
+		// which actions exist. Buttons that already carry a removed action are a
+		// separate matter — those go quiet until the switch comes back on.
+		this.updatePresets()
 		this.#connect()
 	}
 
@@ -333,6 +342,14 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		}
 		this.state.bestPower = powers.length ? Math.max(...powers) : undefined
 		this.state.bestMer = mers.length ? Math.max(...mers) : undefined
+
+		for (const [id, source] of Object.entries(SETTING_SOURCES)) {
+			// A parameter the receiver did not report arrives as '' from
+			// `buildVariableValues`. Keep that as "we do not know" rather than as a
+			// value, so a control button cannot read as selected on the strength of
+			// two empty strings matching.
+			this.state.settings[id as SettingId] = values[source.variable] || undefined
+		}
 	}
 
 	#clearState(): void {
@@ -347,6 +364,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.state.demodTemperature = undefined
 		this.state.decoderTemperature = undefined
 		this.state.cameraBatteryVoltage = undefined
+		this.state.settings = {}
 	}
 
 	/** Record an error, logging only when it changes so polling can't spam the log. */

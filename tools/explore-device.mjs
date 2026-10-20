@@ -88,7 +88,9 @@ function assertSafe(path) {
  *   DB_L2174_SERIAL_NUM                                  unit serial
  */
 function sensitiveMatchers() {
-	// TODO(human): return the matchers for this repository's redaction policy.
+	// PARKED: awaiting the redaction policy for this repository. Until it is
+	// decided, this returns nothing and the fail-closed guard above refuses to
+	// write a fixture copy at all, which is the safe end of the choice.
 }
 
 function isSensitive(name, matchers) {
