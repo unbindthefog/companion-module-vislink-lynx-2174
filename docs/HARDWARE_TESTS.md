@@ -92,8 +92,15 @@ behoben und in `LYNX_L2174_API.md` festgehalten:
   das Modul deshalb je Parameter nur einen Write offen** — am Gerät geprüft,
   der zweite Druck wurde 18,4 s zurückgehalten und gewann dann.
 - Die Einschwingzeit eines Moduswechsels hängt von der **Richtung** ab: nach
-  `LMST(S)` 1,2 s, zurück nach `DVBT` 6–20 s. Die früher notierten „20 s"
-  galten nur für die langsame Richtung.
+  `LMST(S)` 1,2 s, zurück nach `DVBT` 1–20 s — und zwar schwankend zwischen
+  aufeinanderfolgenden Läufen, nicht konstant. Die früher notierten „20 s"
+  galten nur für einen langsamen Lauf.
+- **Offen:** In einem Lauf mit 18 s Einschwingzeit hat der Receiver den direkt
+  danach abgesetzten zweiten Wert verworfen, ohne dass das Modul eine Warnung
+  geloggt hätte. Von Hand nicht nachstellbar (dort war die Umschaltung in 1 s
+  fertig). Entweder hat ein Poll den Wert kurz gesehen, bevor das Gerät
+  zurücksprang — dann wäre das Ausbleiben der Warnung korrekt —, oder es fehlt
+  eine. Braucht einen Lauf, bei dem die langsame Richtung reproduzierbar ist.
 
 **Was der Sweep nicht beantwortet**, und wofür die Abschnitte unten da sind:
 ob ein angenommener Wert auch wirkt. Dafür braucht es Signal, Downconverter,

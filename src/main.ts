@@ -225,8 +225,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		//
 		// Self-limiting rather than a fixed delay: an ordinary parameter reads
 		// back in about 1.5 s and the wait is over, while receive mode holds the
-		// slot for its full twenty. Momentary triggers ask for no read-back, so
-		// they never hold anything up.
+		// slot for its full twenty.
 		// Only verified writes take part. A momentary trigger asks for no
 		// read-back, so it never holds a slot and must never wait for one —
 		// `writeAndConfirm` runs its own confirmation and would otherwise poll
@@ -246,13 +245,21 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// outside the allowlist, and a line saying "Setting X = Y" above that
 		// refusal would claim an effect that never happened.
 		if (verify) this.#inFlight.add(name)
+		let sent = false
 		try {
 			await api.setParameter(name, value)
+			sent = true
 		} finally {
 			this.#inFlight.delete(name)
-			// A throw leaves nothing pending, so whatever was queued behind this
-			// write would wait for a release that never comes.
-			if (!this.#pendingWrites.has(name)) this.#flushQueued(name)
+			// Only when the write never left. A throw leaves nothing pending, so
+			// anything queued behind it would wait for a release that never comes.
+			//
+			// Deliberately not on the way out of a successful write: the pending
+			// entry is armed a few lines further down, so at this point there is
+			// nothing to see, and flushing here would send the queued value
+			// milliseconds behind this one — the back-to-back pair the receiver
+			// cannot digest, and the whole reason this queue exists.
+			if (!sent && !this.#pendingWrites.has(name)) this.#flushQueued(name)
 		}
 		this.log('info', `Setting ${name} = ${value}`)
 		if (this.#connectedTo !== target) {

@@ -840,3 +840,18 @@ Der zweite Wert geht erst, als der erste zurückgelesen ist. Das Ergebnis ist
 der zuletzt gedrückte Wert — was ein zweiter Tastendruck bedeutet. Ohne das
 gingen beide Writes zwei Sekunden auseinander raus, und das Gerät entschied
 selbst, auf welchem es stehenblieb.
+
+**Zwei Einschränkungen, beide am Gerät beobachtet:**
+
+Erstens schwankt die Einschwingzeit derselben Umschaltung erheblich.
+`LMST(S) → DVBT` brauchte in aufeinanderfolgenden Läufen **1 s**, dann **18 s**,
+dann wieder **1 s**. Ob die Entprellung überhaupt greift, hängt also vom Tag ab:
+Bei 1 s ist der erste Write längst bestätigt, bevor ein zweiter Druck kommt, und
+die Warteschlange hat nichts zu tun.
+
+Zweitens ist **„Parameter zurückgelesen" nicht dasselbe wie „Gerät fertig"**. In
+einem Lauf, in dem der erste Write 18 s brauchte, wurde der unmittelbar danach
+abgesetzte zweite Wert vom Receiver verworfen — er blieb auf dem ersten stehen.
+Von Hand ließ sich das nicht nachstellen, weil die Umschaltung dort jeweils in
+1 s fertig war. Die Entprellung verringert das Problem also, beseitigt es aber
+nicht; wer sichergehen will, lässt dem Gerät nach einem Moduswechsel Ruhe.
