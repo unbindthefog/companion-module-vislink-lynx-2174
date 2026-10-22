@@ -804,3 +804,39 @@ Fehlschlag behandelt, liest in diesem Fenster einen leeren Parametersatz.
 
 Wie lange es dauert, bis der Decoder wieder ein Signal verarbeitet, ist damit
 **nicht** beantwortet — am Laborgerät lag keines an.
+
+### Moduswechsel: die Dauer hängt von der Richtung ab
+
+Die „~20 s" weiter oben sind nur die eine Hälfte. Nachgemessen am 22.10.2026,
+jeweils bis `DB_L2174_RX_MODE` den neuen Wert meldet:
+
+| Richtung           | Dauer                  |
+| ------------------ | ---------------------- |
+| `DVBT` → `LMST(S)` | **1,2 s**              |
+| `LMST(S)` → `DVBT` | **6–20 s**, schwankend |
+
+Der Receiver muss offenbar nur in der DVB-T-Richtung neu akquirieren. Die
+frühere Messung von 20 s traf zufällig die langsame Richtung und wurde als
+allgemeingültig notiert — sie ist es nicht.
+
+Für ein schreibendes Tool heißt das: Die Wartezeit auf eine Bestätigung lässt
+sich nicht je Parameter festlegen, sondern nur großzügig nach oben abschätzen.
+`DB_DEMOD_RX_MODE` folgt dabei im Gleichtakt mit `DB_L2174_RX_MODE`; die beiden
+unterscheiden sich in der Schreibweise, nicht im Zeitpunkt.
+
+### Entprellung: warum ein Write je Parameter reicht
+
+Dass der Receiver bei schnellen Folgen auf denselben Parameter durcheinander
+kommt, steht weiter oben. Am 22.10. gegengeprüft, wie sich das mit einem
+Schreibvorgang-je-Parameter verhält — zwei Tasten für denselben Parameter,
+zwei Sekunden auseinander gedrückt:
+
+```
+11:57:38.507  Setting DB_L2174_RX_MODE = DVBT      <- erster Druck, geht sofort raus
+11:57:56.868  Setting DB_L2174_RX_MODE = LMST(S)   <- zweiter Druck, 18,4 s zurückgehalten
+```
+
+Der zweite Wert geht erst, als der erste zurückgelesen ist. Das Ergebnis ist
+der zuletzt gedrückte Wert — was ein zweiter Tastendruck bedeutet. Ohne das
+gingen beide Writes zwei Sekunden auseinander raus, und das Gerät entschied
+selbst, auf welchem es stehenblieb.

@@ -121,17 +121,39 @@ function readingIsUnknown(state: ModuleInstance['state'], _source: string): bool
  * receiver did not report it. `value` is what someone typed into the button, or
  * what a preset put there.
  *
- * Two cases are settled and not up for discussion below: nothing read back and
- * nothing configured both mean "no match", because an empty reading matching an
- * empty field would paint a button green on the strength of knowing nothing.
+ * Nothing read back and nothing configured both mean "no match": an empty
+ * reading matching an empty field would paint a button green on the strength of
+ * knowing nothing.
  *
- * TODO(human): decide how forgiving the comparison itself should be.
+ * Beyond that it is forgiving in three ways, each because the alternative is a
+ * button that silently never lights:
+ *
+ *   - **Whitespace** is ignored. A trailing space in a hand-typed field is a
+ *     slip, never an intention.
+ *   - **Case** is ignored. The receiver has one spelling per value and no two
+ *     values of the same setting differ only in case, so 'on' cannot be made to
+ *     match anything but 'On'.
+ *   - **Numbers compare as numbers.** The receiver reports a preset slot as
+ *     '007'; someone reading it off a button labelled 7 types 7. The only
+ *     setting whose values are numeric at all is the overlay background, whose
+ *     ten steps are distinct as numbers too.
+ *
+ * All three are safe here for the same underlying reason, and it is worth
+ * saying out loud because it is a property of the value lists rather than of
+ * this function: no two values a setting offers collide under any of them.
+ * `test/matching.test.js` checks that, so a future value that would break it
+ * fails there rather than quietly turning a button green for the wrong reason.
  */
 function settingMatches(state: ModuleInstance['state'], setting: SettingId, value: string): boolean {
-	const reading = state.settings[setting]
-	if (reading === undefined || value === '') return false
+	const reading = state.settings[setting]?.trim()
+	const wanted = value.trim()
+	if (!reading || !wanted) return false
 
-	return reading === value
+	if (reading.toLowerCase() === wanted.toLowerCase()) return true
+
+	const a = Number(reading)
+	const b = Number(wanted)
+	return Number.isFinite(a) && Number.isFinite(b) && a === b
 }
 
 export function UpdateFeedbacks(self: ModuleInstance): void {

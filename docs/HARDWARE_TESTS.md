@@ -88,7 +88,12 @@ behoben und in `LYNX_L2174_API.md` festgehalten:
   `DB_STATUS_PIN_ALARM_LEVEL` tauschen mit `DB_STATUS_PIN_MODE` die Plätze.
 - `DB_L2174_VIDEO_INPUT_MODE` verträgt keine Folge, auch keine langsame: drei
   Werte mit 5 s Abstand, und das Gerät bleibt beim ersten; mit 8 s beim
-  mittleren. Der letzte Schreibvorgang gewinnt nicht.
+  mittleren. Der letzte Schreibvorgang gewinnt nicht. **Seit dem 22.10. hält
+  das Modul deshalb je Parameter nur einen Write offen** — am Gerät geprüft,
+  der zweite Druck wurde 18,4 s zurückgehalten und gewann dann.
+- Die Einschwingzeit eines Moduswechsels hängt von der **Richtung** ab: nach
+  `LMST(S)` 1,2 s, zurück nach `DVBT` 6–20 s. Die früher notierten „20 s"
+  galten nur für die langsame Richtung.
 
 **Was der Sweep nicht beantwortet**, und wofür die Abschnitte unten da sind:
 ob ein angenommener Wert auch wirkt. Dafür braucht es Signal, Downconverter,

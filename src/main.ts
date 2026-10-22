@@ -55,9 +55,11 @@ export { UpgradeScripts }
  * How long to wait before saying a write did not take.
  *
  * Measured on the bench unit, 22.10.2026: an ordinary parameter reads back in
- * about 1.5 s, but a receive-mode change takes **20 s**, and a bandwidth change
- * that follows one takes 17 s — the receiver re-acquires before it publishes
- * the new value. The settling times in docs §6 were measured within one mode
+ * about 1.5 s, but a receive-mode change takes up to **20 s** and a bandwidth
+ * change following one takes 17 — the receiver re-acquires before it publishes
+ * the new value. The mode is not even symmetric: into LMST(S) it lands in
+ * 1.2 s, back to DVB-T it takes between 6 and 20 — there is no per-parameter
+ * figure to be had, only a generous upper bound. The settling times in docs §6 were measured within one mode
  * and are the short case, not the worst one.
  *
  * Generous on purpose. The warning is a diagnostic, not the feedback that
@@ -127,6 +129,23 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 * second was a momentary trigger that asks for no check at all.
 	 */
 	#pendingWrites = new Map<string, { value: string; timer: NodeJS.Timeout }>()
+	/**
+	 * A value waiting for the previous write to the same parameter to settle.
+	 *
+	 * At most one per parameter — a third press replaces the second, because
+	 * what someone wants is the value they pressed last, not every value they
+	 * passed through on the way.
+	 */
+	#queuedWrites = new Map<string, { value: string; verify: boolean }>()
+	/**
+	 * Parameters whose write request is out but not yet answered.
+	 *
+	 * Claimed before the request leaves rather than after it returns: the socket
+	 * timeout runs to ten seconds, and two presses inside one round trip would
+	 * otherwise both find nothing pending and go out together — the very
+	 * sequence the receiver cannot digest.
+	 */
+	#inFlight = new Set<string>()
 	/** Host and port the current client was built for, to spot a real retarget. */
 	#connectedTo = ''
 	#hasLoggedSuccess = false
@@ -162,7 +181,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	async destroy(): Promise<void> {
 		this.#stopPolling()
-		this.#forgetPendingWrites()
+		this.#forgetPendingWrites(true)
 		this.#api?.destroy()
 		this.#api = null
 	}
@@ -197,6 +216,27 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		const api = this.#api
 		if (!api) throw new Error('Not connected to a receiver')
 
+		// One write per parameter at a time. Measured on the bench: writing four
+		// values to `DB_L2174_VIDEO_INPUT_MODE` in quick succession left the
+		// receiver on none of them, and spacing them five seconds apart left it
+		// on the *first* — it reconfigures the decoder on each one and does not
+		// queue them reliably. So a second press waits for the first to be seen,
+		// and the last one wins, which is what pressing a button twice means.
+		//
+		// Self-limiting rather than a fixed delay: an ordinary parameter reads
+		// back in about 1.5 s and the wait is over, while receive mode holds the
+		// slot for its full twenty. Momentary triggers ask for no read-back, so
+		// they never hold anything up.
+		// Only verified writes take part. A momentary trigger asks for no
+		// read-back, so it never holds a slot and must never wait for one —
+		// `writeAndConfirm` runs its own confirmation and would otherwise poll
+		// for a value this method had quietly queued instead of sending.
+		if (verify && (this.#inFlight.has(name) || this.#pendingWrites.has(name))) {
+			this.#queuedWrites.set(name, { value, verify })
+			this.log('debug', `${name} is still settling; ${value} will follow`)
+			return
+		}
+
 		// Which receiver this write is going to. The request below can be in
 		// flight for up to the socket timeout, and the connection can be pointed
 		// somewhere else in the meantime — in which case there is nothing left to
@@ -205,7 +245,15 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// Logged after the fact, not before: `setParameter` refuses anything
 		// outside the allowlist, and a line saying "Setting X = Y" above that
 		// refusal would claim an effect that never happened.
-		await api.setParameter(name, value)
+		if (verify) this.#inFlight.add(name)
+		try {
+			await api.setParameter(name, value)
+		} finally {
+			this.#inFlight.delete(name)
+			// A throw leaves nothing pending, so whatever was queued behind this
+			// write would wait for a release that never comes.
+			if (!this.#pendingWrites.has(name)) this.#flushQueued(name)
+		}
 		this.log('info', `Setting ${name} = ${value}`)
 		if (this.#connectedTo !== target) {
 			this.log('warn', `${name} was set on a receiver this connection no longer points at; not checking it`)
@@ -225,7 +273,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		}
 
 		// Measured on the bench: most parameters read back in about 1.5 s, but a
-		// receive-mode change takes around 20 s and a bandwidth change following
+		// receive-mode change takes up to 20 s and a bandwidth change following
 		// one about 17 — the receiver re-acquires first. Three catch-up polls
 		// rather than one guessed delay: the first two keep an ordinary button
 		// feeling immediate, the third is there for the slow pair, so they do not
@@ -246,12 +294,17 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 */
 	#armVerifyTimer(name: string, value: string, mayRetry: boolean): void {
 		const timer = setTimeout(() => {
-			this.#pendingWrites.delete(name)
 			if (mayRetry && this.#isPolling) {
+				// Replaces the entry rather than removing it, so the slot stays
+				// claimed and nothing queued behind it is released early.
 				this.#armVerifyTimer(name, value, false)
 				return
 			}
 			this.log('warn', `${name} still does not read ${JSON.stringify(value)} — the receiver may have rejected it`)
+			// Through the one door, so a value waiting behind this one is sent
+			// rather than left in the queue — where a later press would find it
+			// and overwrite itself with it.
+			this.#forgetPendingWrite(name)
 		}, this.#verifyWindowMs())
 		timer.unref?.()
 		this.#pendingWrites.set(name, { value, timer })
@@ -323,12 +376,36 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		if (!pending) return
 		clearTimeout(pending.timer)
 		this.#pendingWrites.delete(name)
+
+		// Whatever was pressed while this one was settling goes out now.
+		this.#flushQueued(name)
+	}
+
+	/** Send the value that was waiting for this parameter, if there is one. */
+	#flushQueued(name: string): void {
+		const queued = this.#queuedWrites.get(name)
+		if (!queued) return
+		this.#queuedWrites.delete(name)
+		void this.writeParameter(name, queued.value, queued.verify).catch((e) =>
+			this.log('error', `Could not set ${name}: ${e instanceof Error ? e.message : String(e)}`),
+		)
 	}
 
 	/** Stop waiting on everything — the receiver is gone or the address changed. */
-	#forgetPendingWrites(): void {
+	#forgetPendingWrites(dropQueued = false): void {
 		for (const pending of this.#pendingWrites.values()) clearTimeout(pending.timer)
 		this.#pendingWrites.clear()
+
+		if (!dropQueued) return
+		// Only when the connection has been pointed somewhere else, or taken
+		// down: these values were meant for a receiver this connection is no
+		// longer talking to. A single failed poll is not that — the backoff
+		// treats one dropped answer as ordinary, and so should a press that is
+		// waiting its turn.
+		for (const [name, queued] of this.#queuedWrites) {
+			this.log('debug', `Dropping queued ${name} = ${queued.value}: the connection moved`)
+		}
+		this.#queuedWrites.clear()
 	}
 
 	updateActions(): void {
@@ -361,7 +438,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// moved, and dropping the checks there would lose the one warning that
 		// explains why a button did not take.
 		const target = `${host ?? ''}:${this.config.port || 80}`
-		if (target !== this.#connectedTo) this.#forgetPendingWrites()
+		if (target !== this.#connectedTo) this.#forgetPendingWrites(true)
 		this.#connectedTo = target
 
 		if (!host) {
@@ -456,6 +533,13 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 					this.log('debug', `${name} is not in data.xml in this mode, so the write cannot be confirmed`)
 					this.#forgetPendingWrite(name)
 				}
+			}
+
+			// Anything still waiting with nothing pending in front of it — a write
+			// that failed while the receiver was away, or a queue that outlived a
+			// dropped answer. This is the point at which we know contact is back.
+			for (const name of [...this.#queuedWrites.keys()]) {
+				if (!this.#pendingWrites.has(name) && !this.#inFlight.has(name)) this.#flushQueued(name)
 			}
 
 			this.#consecutiveFailures = 0
