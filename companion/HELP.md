@@ -4,7 +4,14 @@ Monitors a Vislink Lynx L2174 RF broadcast receiver through its built-in
 `data.xml` status page and exposes the receiver's state as Companion variables
 and feedbacks.
 
-**What it may change.** The module reads freely and writes only the 35
+**Read only.** A switch per connection turns the module into a pure monitor:
+variables and feedbacks keep working, and there are no actions at all — nothing
+to place on a button by mistake, and a button that already carries one cannot
+reach the receiver either, because the refusal also sits in the client. The
+connection list shows `Read only` while it is on. That is the right setting for
+a receiver that is on air.
+
+**What it may change**, when that switch is off. The module reads freely and writes only the 35
 parameters its actions need — reception, routing, video output and the status
 pin. Everything else the receiver would accept is refused in the client itself,
 so a mistake cannot reach it: key material, licence entry, restoring defaults
@@ -24,7 +31,8 @@ than a list of things to avoid.
 | Receiver address     | IP address or hostname of the L2174.                                                                        |
 | Port                 | Normally `80`.                                                                                              |
 | Poll interval        | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second. |
-| Interrupting actions | Off by default. While off, preset recall and store, reboot and downconverter power are not offered at all.  |
+| Read only            | Off by default. While on there are no actions, no control presets, and nothing is ever written.             |
+| Interrupting actions | Off by default, and hidden while read only is on. Preset recall and store, reboot and downconverter power.  |
 
 There is nothing to configure about the transport — the receiver serves
 `data.xml` over plain HTTP with no authentication.
@@ -181,7 +189,8 @@ surely as too little. Its preset stacks four feedbacks: green from −6 to
 ## Presets
 
 The module ships 105 ready-made buttons you can drag straight onto a page, or
-146 with the interrupting actions switched on.
+146 with the interrupting actions switched on — and 21, the monitoring ones
+alone, under read only.
 Monitoring first, then one button per value for everything the actions can set:
 
 | Section               | Buttons                                                                      |
@@ -260,7 +269,9 @@ With **interrupting actions** switched on, four more appear:
 Switching the setting back off removes them from the list again, but a button
 that already carries one keeps it and goes quiet: pressing it does nothing
 until the setting is on again. Nothing on the button says so — worth knowing
-before wondering why it stopped working.
+before wondering why it stopped working. The same is true under read only,
+except there the connection list says `Read only`, which is at least a place to
+look.
 
 Writes are read back. The receiver answers every write with `200` even when it
 discards the value, so the module polls again afterwards and logs a warning if

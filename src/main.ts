@@ -1,5 +1,5 @@
 import { InstanceBase, InstanceStatus, type SomeCompanionConfigField } from '@companion-module/base'
-import { GetConfigFields, type ModuleConfig } from './config.js'
+import { GetConfigFields, guardedActionsEnabled, writesAllowed, type ModuleConfig } from './config.js'
 import {
 	UpdateVariableDefinitions,
 	buildVariableValues,
@@ -162,8 +162,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
-		// The guarded actions appear and disappear with the switch, so the list has
-		// to be rebuilt rather than only reconnected.
+		// The action list depends on two switches — read-only and the interrupting
+		// actions — so it has to be rebuilt rather than only reconnected.
 		this.updateActions()
 		// And the presets that hand them out, so the two lists never disagree about
 		// which actions exist. Buttons that already carry a removed action are a
@@ -378,7 +378,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			// Give a slow receiver room to answer, but never stall longer than a
 			// few poll cycles or the connection status goes stale.
 			timeoutMs: Math.min(Math.max(2000, pollInterval * 2), 10000),
-			allowGuardedWrites: this.config.allowGuardedActions === true,
+			allowWrites: writesAllowed(this),
+			allowGuardedWrites: guardedActionsEnabled(this),
 		}
 
 		if (this.#api) {
@@ -442,7 +443,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.#consecutiveFailures = 0
 			this.state.contact = 'ok'
 			this.#setError('')
-			this.updateStatus(InstanceStatus.Ok)
+			// Named in the status rather than left to be discovered: a control
+			// button under read-only looks exactly as it did and simply does
+			// nothing, and the connection list is where someone looks first.
+			this.updateStatus(InstanceStatus.Ok, writesAllowed(this) ? null : 'Read only')
 
 			if (!this.#hasLoggedSuccess) {
 				const webId = params.DB_L2174_WEB_TEXT || 'unnamed'

@@ -134,6 +134,11 @@ a wrong value kills reception silently); the CCU and L1500 return path (not
 testable without a camera and a modem). `DB_L2174_SET_ALL` is a momentary
 trigger that copies channel 1 to all four — not in yet, undecided.
 
+Read only (2026-10-22): a per-connection switch that empties the action list,
+drops the control presets and refuses the write in `src/api.ts` as well — the
+last of those at the moment the request leaves the queue, not when the action is
+called, which also retires the finding carried since `db46ba7`.
+
 Still open on the control side:
 
 - [ ] Decide how forgiving `settingMatches()` should be (`src/feedbacks.ts`

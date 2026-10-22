@@ -3,7 +3,7 @@ import type ModuleInstance from './main.js'
 import type { ModuleSchema } from './main.js'
 import { ALARM_STYLE, DESTRUCTIVE_STYLE, OK_STYLE, READOUT_STYLE, UNKNOWN_STYLE, WARNING_STYLE } from './feedbacks.js'
 import { CHANNEL_IDS, type SettingId } from './types.js'
-import { guardedActionsEnabled } from './config.js'
+import { guardedActionsEnabled, writesAllowed } from './config.js'
 import {
 	CONTROL_CHANNELS,
 	CONTROL_SECTIONS,
@@ -356,8 +356,13 @@ export function UpdatePresets(self: ModuleInstance): void {
 		groups[setting.section].push({ id: `set_${setting.id}`, type: 'simple', name: setting.label, presets: ids })
 	}
 
+	// Every control preset carries an action, and under read-only there are no
+	// actions — so the monitoring sections stay and the Control ones do not
+	// appear at all, rather than handing out buttons that land as "unknown
+	// action".
+	const writes = writesAllowed(self)
 	const guardedOn = guardedActionsEnabled(self)
-	for (const setting of CONTROL_SETTINGS) {
+	for (const setting of writes ? CONTROL_SETTINGS : []) {
 		// A preset whose action the switch has removed would reach the button as
 		// "unknown action", so it is not offered either.
 		if (setting.guarded && !guardedOn) continue
@@ -368,13 +373,19 @@ export function UpdatePresets(self: ModuleInstance): void {
 	// value — this is a starting point to edit. It shows the frequency it would
 	// tune to above the one the receiver is actually on, which is the closest
 	// thing to a match indicator a free-form field can have.
-	presets['set_frequency'] = {
-		type: 'simple',
-		name: 'Retune — set receive frequency',
-		keywords: ['frequency', 'tune', 'ghz', 'retune'],
-		style: { ...READOUT_STYLE, text: `TUNE 2.325\n$(${SELF}:rf_frequency)`, size: '7' },
-		feedbacks: [unknownCover('unit')],
-		steps: [{ down: [{ actionId: 'set_frequency', options: { frequency: 2.325 } }], up: [] }],
+	//
+	// Not in the table, so it needs its own read-only check. Companion says so
+	// out loud when one is missed: "preset definitions reference unknown action
+	// definitions".
+	if (writes) {
+		presets['set_frequency'] = {
+			type: 'simple',
+			name: 'Retune — set receive frequency',
+			keywords: ['frequency', 'tune', 'ghz', 'retune'],
+			style: { ...READOUT_STYLE, text: `TUNE 2.325\n$(${SELF}:rf_frequency)`, size: '7' },
+			feedbacks: [unknownCover('unit')],
+			steps: [{ down: [{ actionId: 'set_frequency', options: { frequency: 2.325 } }], up: [] }],
+		}
 	}
 
 	// Preset recall only appears while the connection offers the interrupting
@@ -387,7 +398,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 	// after a recall and the slot number does not change. Green here would mean
 	// something different from green on every other control button, and a colour
 	// that means two things is worse than no colour.
-	const presetSlots = guardedActionsEnabled(self) ? Array.from({ length: 16 }, (_, i) => i + 1) : []
+	const presetSlots = guardedOn ? Array.from({ length: 16 }, (_, i) => i + 1) : []
 	for (const slot of presetSlots) {
 		presets[`recall_preset_${slot}`] = {
 			type: 'simple',
@@ -466,7 +477,10 @@ export function UpdatePresets(self: ModuleInstance): void {
 			name: 'Decoder',
 			definitions: ['video_lock', 'video_format', 'audio_lock'],
 		},
-		...(Object.keys(CONTROL_SECTIONS) as ControlSection[]).map((key) => ({
+		// Under read-only there are no control buttons at all, so the four Control
+		// sections go with them — four empty headings say nothing the switch has
+		// not already said.
+		...(writes ? (Object.keys(CONTROL_SECTIONS) as ControlSection[]) : []).map((key) => ({
 			id: `control_${key}`,
 			name: CONTROL_SECTIONS[key].name,
 			description: CONTROL_SECTIONS[key].description,

@@ -8,6 +8,8 @@ export type LynxApiOptions = {
 	host: string
 	port: number
 	timeoutMs: number
+	/** Whether this connection may write at all. False turns the client into a reader. */
+	allowWrites: boolean
 	/** Whether the interrupting writes in GUARDED_PARAMETERS are permitted. */
 	allowGuardedWrites: boolean
 }
@@ -233,16 +235,38 @@ export class LynxApi {
 	 */
 	async setParameter(name: string, value: string): Promise<void> {
 		const key = name.trim().toUpperCase()
-		if (!SAFE_PARAMETERS.has(key)) {
-			if (!GUARDED_PARAMETERS.has(key)) {
-				throw new Error(`Refusing to write ${name}: not one of the parameters this module may change`)
-			}
-			if (!this.#options.allowGuardedWrites) {
-				throw new Error(`Refusing to write ${name}: enable "guarded actions" in the connection config first`)
-			}
-		}
 		const path = `/common/iframe.php?param=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`
-		await this.#get(path)
+
+		// Refused here, and then again when the request actually leaves — see
+		// `#refuseWrite`. Checking only at this point would let a press that is
+		// already sitting in the queue go out after the connection has been set
+		// to read only, or after it has been pointed at a different receiver.
+		const refusal = this.#refuseWrite(key)
+		if (refusal) throw new Error(`Refusing to write ${name}: ${refusal}`)
+
+		await this.#get(path, () => {
+			const late = this.#refuseWrite(key)
+			if (late) throw new Error(`Refusing to write ${name}: ${late}`)
+			// The receiver this write was meant for. Between the press and the
+			// request leaving, the connection can have been pointed somewhere
+			// else, and the value would land on a receiver nobody aimed at.
+			return `${this.#options.host}:${this.#options.port}`
+		})
+	}
+
+	/**
+	 * Why this parameter may not be written, or `undefined` if it may.
+	 *
+	 * Three guards, outermost first. Read-only is a statement about the receiver
+	 * rather than about the parameter, so it comes before the allowlist: with it
+	 * on there is no parameter this connection may change.
+	 */
+	#refuseWrite(key: string): string | undefined {
+		if (!this.#options.allowWrites) return 'this connection is set to read only'
+		if (SAFE_PARAMETERS.has(key)) return undefined
+		if (!GUARDED_PARAMETERS.has(key)) return 'not one of the parameters this module may change'
+		if (!this.#options.allowGuardedWrites) return 'enable "guarded actions" in the connection config first'
+		return undefined
 	}
 
 	async getParameters(): Promise<RawParameters> {
@@ -250,11 +274,18 @@ export class LynxApi {
 		return parseParameters(body)
 	}
 
-	async #get(path: string): Promise<string> {
-		const request = this.#queue.then(
-			async () => this.#run(path),
-			async () => this.#run(path),
-		)
+	/**
+	 * Queue a request. `beforeSend` runs once this request is the one going out.
+	 *
+	 * That is the only moment at which "may this happen, and to whom" can be
+	 * answered honestly: the queue is serial and a slow receiver can hold a
+	 * request behind a poll for as long as the socket timeout, which is ample
+	 * time for someone to change the connection's mind. It returns the target
+	 * it checked against, so `#run` cannot read a newer one.
+	 */
+	async #get(path: string, beforeSend?: () => string): Promise<string> {
+		const run = async () => this.#run(path, beforeSend?.())
+		const request = this.#queue.then(run, run)
 
 		// Keep the queue alive even if a caller lets the rejection propagate.
 		this.#queue = request.catch(() => undefined)
@@ -262,10 +293,16 @@ export class LynxApi {
 		return request
 	}
 
-	async #run(path: string): Promise<string> {
+	async #run(path: string, checkedTarget?: string): Promise<string> {
 		const { host, port, timeoutMs } = this.#options
 
 		if (!host) throw new Error('No receiver address configured')
+		// Belt and braces: `beforeSend` has just read these, so a mismatch would
+		// mean they changed inside this tick, which they cannot. Cheap enough to
+		// keep as the thing that makes the guarantee local to the send.
+		if (checkedTarget !== undefined && checkedTarget !== `${host}:${port}`) {
+			throw new Error('Refusing to write: the connection was pointed at a different receiver')
+		}
 
 		this.#pending++
 		try {

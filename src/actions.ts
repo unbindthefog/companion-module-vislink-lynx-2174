@@ -1,5 +1,5 @@
 import type ModuleInstance from './main.js'
-import { guardedActionsEnabled } from './config.js'
+import { guardedActionsEnabled, writesAllowed } from './config.js'
 import { CONTROL_CHANNELS, CONTROL_SETTINGS, type ControlSetting, controlParameter } from './controls.js'
 
 /**
@@ -263,6 +263,19 @@ export function UpdateActions(self: ModuleInstance): void {
 	}
 
 	Object.assign(definitions, handwritten)
+
+	// Read-only empties the list rather than leaving actions that refuse: an
+	// action nobody can place is the honest form of "this connection does not
+	// write", while one that sits in the list and fails on the press is not.
+	//
+	// Blanked here rather than skipped above, so that what disappears is exactly
+	// what would otherwise have appeared. The SDK removes an action by being
+	// handed `undefined` for its id, not by the id being absent, and a second
+	// list of ids to keep in step would be one more thing to forget.
+	if (!writesAllowed(self)) {
+		for (const actionId of Object.keys(definitions)) definitions[actionId] = undefined
+	}
+
 	self.setActionDefinitions(definitions as Parameters<typeof self.setActionDefinitions>[0])
 }
 

@@ -9,6 +9,10 @@ End-user documentation lives in [`companion/HELP.md`](companion/HELP.md).
 Notes on the receiver's (undocumented) API, gathered by exploring a live unit
 read-only, live in [`docs/LYNX_L2174_API.md`](docs/LYNX_L2174_API.md).
 
+> **A connection can be set to read only**, and then there are no actions at
+> all — the list is empty, so nothing can be placed, and a button saved earlier
+> is refused in the client. Otherwise:
+>
 > **Writes are a short allowlist, not a free hand.** Of the 88 parameters the
 > receiver's own web interface can set, the module changes 27 for its everyday
 > actions and 8 more only when a per-connection switch is on: preset recall,
