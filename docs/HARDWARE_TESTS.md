@@ -47,6 +47,21 @@ Signal, am 20.10.2026.
 | `set_freeze_on_loss`  | `Blue` → `Freeze` → `Blue`                                                     |
 | `set_lnb_power`       | Kanal 1 `On` → `Off`, **ohne Last am Koax** — siehe Abschnitt 1                |
 
+Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
+
+| Action            | Nachweis                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `store_preset`    | Slot 16 geladen, **derselbe** Inhalt zurückgespeichert, Slot danach unverändert — die Kette belegt, ohne etwas zu verlieren    |
+| `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
+| `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
+
+Damit sind **11 der 28 Actions** über eine Companion-Taste ausgelöst worden:
+die neun aus der Tabelle darüber plus Store und Reboot. Die übrigen 17 sind im
+Sweep weiter unten **auf Parameterebene** geprüft — jeder Wert geschrieben und
+zurückgelesen —, aber nicht über ihre Action. Das ist der verbleibende
+Unterschied: Der Schreibpfad des Moduls ist für alle derselbe tabellengetriebene
+Code, nachgewiesen ist er an elfen.
+
 ## Sweep vom 22.10.2026: jeder Wert einmal geschrieben
 
 Alle Auswahl-Parameter einmal durch ihre Werte gefahren, jeweils geschrieben und
@@ -175,12 +190,12 @@ erreichbar.
 
 ## 7. Nicht auf Sendung, und mit Ansage
 
-| Action                                                    | Warum                                                                                                                     |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `store_preset`                                            | Überschreibt den Slot endgültig. Vorher wissen, was drin war — `recall_preset` auf denselben Slot und den Zustand sichern |
-| `reboot_receiver`                                         | Etwa eine Minute ohne Decoder                                                                                             |
-| `set_status_pin_mode` / `_state` / `_alarm_level`         | Der Status-Pin hängt unter Umständen in einer Haustechnik. Erst klären, was daran angeschlossen ist                       |
-| Routing (`set_asi_output_source`, `set_ip_output_source`) | Nimmt einem nachgelagerten Gerät das Signal weg                                                                           |
+| Action                                                    | Warum                                                                                                                                              |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `store_preset`                                            | Überschreibt den Slot endgültig. Am 22.10. verlustfrei geprüft, indem erst derselbe Slot geladen wurde; für jeden anderen Slot gilt der Rat weiter |
+| `reboot_receiver`                                         | Etwa 20 s nicht ansprechbar (gemessen); wie lange bis wieder dekodiert wird, ist ohne Signal offen                                                 |
+| `set_status_pin_mode` / `_state` / `_alarm_level`         | Der Status-Pin hängt unter Umständen in einer Haustechnik. Erst klären, was daran angeschlossen ist                                                |
+| Routing (`set_asi_output_source`, `set_ip_output_source`) | Nimmt einem nachgelagerten Gerät das Signal weg                                                                                                    |
 
 Beim Status-Pin meldet das Gerät immer nur **einen** der beiden Pegel zurück,
 je nach Modus (siehe Sweep oben). Dass ein Wert ankommt, ist damit im passenden

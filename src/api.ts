@@ -54,7 +54,9 @@ function friendlyError(err: NodeJS.ErrnoException, host: string, path: string): 
 		case 'ENOTFOUND':
 			return `Host not found (${host})`
 		case 'ECONNREFUSED':
-			return `Connection refused by ${host} — is the port correct?`
+			// Not only a wrong port: a receiver that is restarting refuses for
+			// about a second and a half before its web server is up again.
+			return `Nothing is listening on ${host} — the receiver may be restarting, or the port may be wrong`
 		case 'EHOSTUNREACH':
 		case 'ENETUNREACH':
 			return `Host unreachable (${host}) — check network/VLAN`
@@ -183,7 +185,8 @@ export const CONDITIONAL_PARAMETERS: ReadonlySet<string> = new Set(['DB_STATUS_P
  * "guarded actions" switch is on.
  *
  * Recalling a preset reconfigures the whole receiver at once and a reboot takes
- * it off air for a minute — both are legitimate remote-hands operations and both
+ * it away for about twenty seconds — both are legitimate remote-hands
+ * operations and both
  * are the wrong thing to hit by accident mid-show. The switch is off by default,
  * and while it is off these actions are not offered at all rather than offered
  * and ignored.

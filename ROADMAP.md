@@ -126,8 +126,13 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       left changed. What the sweep cannot show is whether an accepted value
       takes effect — that still needs signal, a downconverter, a monitor or a
       reference, per `docs/HARDWARE_TESTS.md`
-- [ ] Store preset and reboot are still untriggered: one overwrites a slot for
-      good, the other takes the unit off air.
+- [x] Store preset and reboot triggered on the lab unit (2026-10-22), which
+      brings the actions pressed as a Companion button to 11 of 28 — the other
+      17 are covered on the parameter level by the sweep above, not through
+      their action. Store was tested without losing anything by
+      recalling slot 16 first and writing the same contents back; reboot
+      answers again after 20 s, not the minute the action used to claim, and
+      keeps its configuration
 
 Deliberately left out: AES/BISS/EBS key material, licence entry,
 `DB_RESTORE_DEFAULTS` and the descrambling type (all refused in `api.ts`);

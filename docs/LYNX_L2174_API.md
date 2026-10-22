@@ -784,3 +784,23 @@ der zuletzt geschriebenen Werte. Für ein schreibendes Tool heißt das: diesen
 Parameter nicht mehrfach kurz hintereinander setzen, und sich nicht darauf
 verlassen, dass der letzte Schreibvorgang gewinnt. Das Zurücklesen meldet den
 Fehlstand korrekt — es ist die einzige Instanz, die ihn bemerkt.
+
+### Was ein Reboot tut, gemessen
+
+`DB_L2174_REBOOT=Yes` am Laborgerät ausgelöst (22.10.2026), Ablauf aus Sicht
+eines pollenden Clients:
+
+| nach     | Beobachtung                                                     |
+| -------- | --------------------------------------------------------------- |
+| 1,4 s    | `ECONNREFUSED` — der Webserver ist weg                          |
+| ~8 s     | Anfrage läuft in den Timeout                                    |
+| ~12 s    | Webserver antwortet wieder, aber **`HTTP 404` auf `/data.xml`** |
+| **20 s** | `/data.xml` ist da, Konfiguration unverändert                   |
+
+Zwei Dinge für ein pollendes Tool: Das Gerät ist nach **20 Sekunden** wieder
+ansprechbar, nicht nach einer Minute — und es gibt ein Fenster, in dem der
+Webserver schon läuft, `data.xml` aber noch fehlt. Wer `404` nicht als
+Fehlschlag behandelt, liest in diesem Fenster einen leeren Parametersatz.
+
+Wie lange es dauert, bis der Decoder wieder ein Signal verarbeitet, ist damit
+**nicht** beantwortet — am Laborgerät lag keines an.

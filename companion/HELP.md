@@ -267,7 +267,7 @@ With **interrupting actions** switched on, four more appear:
 | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | **Recall preset**           | Loads a stored configuration — frequency, bandwidth, mode and routing change at once.                       |
 | **Store preset**            | Overwrites the chosen slot with the current settings. The previous contents are gone.                       |
-| **Reboot receiver**         | Off air for about a minute.                                                                                 |
+| **Reboot receiver**         | Answers again after about 20 s with its configuration intact; decoding takes longer.                        |
 | **Set downconverter power** | Puts DC on an antenna input (1–4) to feed a downconverter. Whatever is on the far end of that coax gets it. |
 
 Switching the setting back off removes them from the list again, but a button
@@ -340,7 +340,7 @@ obviously empty one.
 
 | Symptom                                          | Cause                                                                                                        |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `Connection refused`                             | Wrong port, or the receiver's web interface is not running.                                                  |
+| `Nothing is listening on …`                      | Wrong port, or the receiver is restarting (a reboot takes about 20 s), or its web interface is not running.  |
 | `Host unreachable` / `No route to …`             | The receiver is on a different network or VLAN than the Companion machine.                                   |
 | `HTTP 404` / non-200 for `/data.xml`             | Firmware or URL path differs from what this module expects — please open an issue with the firmware version. |
 | Variables stay empty but the connection is green | The receiver returned an unexpected shape. Enable debug logging and open an issue.                           |

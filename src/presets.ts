@@ -432,11 +432,11 @@ export function UpdatePresets(self: ModuleInstance): void {
 	}
 
 	// One button, not sixteen: there is nothing to pick. Same red as store, for
-	// the same reason — a minute off air is not something to discover afterwards.
+	// the same reason — twenty seconds away, and longer before it decodes again, is not something to discover afterwards.
 	if (presetSlots.length) {
 		presets['reboot_receiver'] = {
 			type: 'simple',
-			name: 'Reboot receiver (off air ~1 min)',
+			name: 'Reboot receiver (interrupts)',
 			keywords: ['reboot', 'restart', 'power'],
 			style: { ...DESTRUCTIVE_STYLE, text: 'REBOOT', size: '14' },
 			// Red stays red, for the same reason as store above.

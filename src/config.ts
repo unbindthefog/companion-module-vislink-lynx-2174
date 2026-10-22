@@ -77,7 +77,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			width: 12,
 			label: 'Actions that interrupt, or put voltage on an input',
 			value:
-				'Four things stay out of the action list until you switch them on here. Recalling a preset reconfigures the receiver in one step and storing one overwrites the slot for good; a reboot takes it off air for about a minute. The fourth is different in kind: switching downconverter power puts DC on that antenna input, and whatever is on the far end of the coax gets it. All four are useful from a distance and all four are the wrong thing to hit by accident.',
+				'Four things stay out of the action list until you switch them on here. Recalling a preset reconfigures the receiver in one step and storing one overwrites the slot for good; a reboot takes the receiver away for about twenty seconds, and longer before it decodes again. The fourth is different in kind: switching downconverter power puts DC on that antenna input, and whatever is on the far end of the coax gets it. All four are useful from a distance and all four are the wrong thing to hit by accident.',
 			// Nothing to decide while the connection writes nothing at all.
 			isVisibleExpression: '!$(options:readOnly)',
 		},

@@ -255,8 +255,9 @@ export function UpdateActions(self: ModuleInstance): void {
 
 		reboot_receiver: guarded
 			? {
-					name: 'Reboot receiver (off air ~1 min)',
-					description: 'Restarts the receiver. It stops decoding until it is back.',
+					name: 'Reboot receiver (interrupts)',
+					description:
+						'Restarts the receiver. Measured on the bench: it answers again after about 20 seconds, and reports the configuration it had. How long until it decodes a signal again was not measured — there was none to decode.',
 					options: [],
 					callback: async () => void (await write('DB_L2174_REBOOT', 'Yes', false)),
 				}
