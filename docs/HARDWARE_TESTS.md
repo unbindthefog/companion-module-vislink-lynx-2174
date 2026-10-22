@@ -47,6 +47,32 @@ Signal, am 20.10.2026.
 | `set_freeze_on_loss`  | `Blue` → `Freeze` → `Blue`                                                     |
 | `set_lnb_power`       | Kanal 1 `On` → `Off`, **ohne Last am Koax** — siehe Abschnitt 1                |
 
+## Sweep vom 22.10.2026: jeder Wert einmal geschrieben
+
+Alle Auswahl-Parameter einmal durch ihre Werte gefahren, jeweils geschrieben und
+zurückgelesen, danach auf den Ausgangswert zurück. Gerät anschließend
+byteweise wie vorher.
+
+**Angenommen wurde ausnahmslos jeder Wert**, den das Modul anbietet — Guard
+Interval (5), Polarität (3), Kanal-Enable (4×2), ASI- und IP-Ausgangsquelle
+(je 4), ASI-Diversity, Diversity-Delay, Video-Input-Modus (4), Genlock (3),
+beide Ausgangsformate (je 4, **einschließlich Composite auf Ausgang 1**),
+Overlay-Typ, -Hintergrund (11) und -Farbe, Status-Pin-Modus und -Alarmpegel.
+Die Wertelisten in `src/controls.ts` stimmen damit gegen das Gerät.
+
+Zwei Dinge kamen dabei heraus, die vorher falsch im Code standen — beide sind
+behoben und in `LYNX_L2174_API.md` festgehalten:
+
+- `data.xml` führt nicht immer dieselben Parameter. `DB_STATUS_PIN_STATE` und
+  `DB_STATUS_PIN_ALARM_LEVEL` tauschen mit `DB_STATUS_PIN_MODE` die Plätze.
+- `DB_L2174_VIDEO_INPUT_MODE` verträgt keine Folge, auch keine langsame: drei
+  Werte mit 5 s Abstand, und das Gerät bleibt beim ersten; mit 8 s beim
+  mittleren. Der letzte Schreibvorgang gewinnt nicht.
+
+**Was der Sweep nicht beantwortet**, und wofür die Abschnitte unten da sind:
+ob ein angenommener Wert auch wirkt. Dafür braucht es Signal, Downconverter,
+Monitor oder Referenz.
+
 ## 1. Downconverter-Speisung unter Last
 
 Das Einzige, was am Tischgerät nur halb beantwortet werden konnte. Der Write
@@ -156,9 +182,10 @@ erreichbar.
 | `set_status_pin_mode` / `_state` / `_alarm_level`         | Der Status-Pin hängt unter Umständen in einer Haustechnik. Erst klären, was daran angeschlossen ist                       |
 | Routing (`set_asi_output_source`, `set_ip_output_source`) | Nimmt einem nachgelagerten Gerät das Signal weg                                                                           |
 
-`set_status_pin_state` ist dabei der einzige Parameter im ganzen Modul, den das
-Gerät **nicht** in `data.xml` zurückmeldet. Ob er wirkt, lässt sich nur am Pin
-selbst messen — ein Multimeter daran ist der einzige Nachweis.
+Beim Status-Pin meldet das Gerät immer nur **einen** der beiden Pegel zurück,
+je nach Modus (siehe Sweep oben). Dass ein Wert ankommt, ist damit im passenden
+Modus belegt — ob am Pin tatsächlich die Spannung anliegt, sagt auch das nicht.
+Dafür bleibt ein Multimeter der einzige Nachweis.
 
 ## Was aus den Ergebnissen folgen kann
 

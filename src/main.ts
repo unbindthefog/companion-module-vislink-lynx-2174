@@ -10,7 +10,14 @@ import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions, type ActionsSchema } from './actions.js'
 import { UpdateFeedbacks, ALL_FEEDBACKS, type FeedbacksSchema } from './feedbacks.js'
 import { UpdatePresets } from './presets.js'
-import { GUARDED_PARAMETERS, LynxApi, SAFE_PARAMETERS, classifyFailure, type ContactFailure } from './api.js'
+import {
+	CONDITIONAL_PARAMETERS,
+	GUARDED_PARAMETERS,
+	LynxApi,
+	SAFE_PARAMETERS,
+	classifyFailure,
+	type ContactFailure,
+} from './api.js'
 import { CHANNEL_IDS, SETTING_SOURCES } from './types.js'
 import { driftedControlIds, unlistedControlParameters } from './controls.js'
 
@@ -437,7 +444,18 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 
 			for (const [name, pending] of this.#pendingWrites) {
-				if (params[name] === pending.value) this.#forgetPendingWrite(name)
+				if (params[name] === pending.value) {
+					this.#forgetPendingWrite(name)
+				} else if (params[name] === undefined && CONDITIONAL_PARAMETERS.has(name)) {
+					// Absent is not the same as rejected — for these two. They swap
+					// places in data.xml with the pin mode, and a write to the one
+					// currently out of view is taken all the same, so there is nothing
+					// to check it against. Narrowed to the named pair on purpose: any
+					// parameter can be missing from a short answer, and treating that
+					// as "never mind" would cancel every pending check at once.
+					this.log('debug', `${name} is not in data.xml in this mode, so the write cannot be confirmed`)
+					this.#forgetPendingWrite(name)
+				}
 			}
 
 			this.#consecutiveFailures = 0

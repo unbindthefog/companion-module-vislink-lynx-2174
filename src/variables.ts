@@ -61,6 +61,7 @@ export type VariablesSchema = ChannelVariables & {
 
 	// Unit
 	status_pin_mode: string
+	status_pin_state: string
 	status_pin_alarm_level: string
 
 	// Camera control
@@ -120,7 +121,8 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 		audio2_locked: { name: 'Audio 2 lock (Locked / No Lock)' },
 
 		status_pin_mode: { name: 'Status pin mode (Alarm / Manual)' },
-		status_pin_alarm_level: { name: 'Status pin level when alarmed (High / Low)' },
+		status_pin_state: { name: 'Status pin level now (High / Low; only reported in Manual mode)' },
+		status_pin_alarm_level: { name: 'Status pin level when alarmed (High / Low; only reported in Alarm mode)' },
 
 		ccu_status: { name: 'Camera control unit status' },
 
@@ -217,6 +219,9 @@ export function buildVariableValues(params: RawParameters): Partial<VariablesSch
 		audio2_locked: str(params.DB_DECOD_AUDIO_B_LOCKED),
 
 		status_pin_mode: str(params.DB_STATUS_PIN_MODE),
+		// The receiver publishes exactly one of these two, depending on the pin
+		// mode, so the other is empty rather than wrong.
+		status_pin_state: str(params.DB_STATUS_PIN_STATE),
 		status_pin_alarm_level: str(params.DB_STATUS_PIN_ALARM_LEVEL),
 
 		ccu_status: str(params.DB_CCU_STATUS),

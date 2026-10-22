@@ -128,8 +128,9 @@ function controlAction(setting: ControlSetting, write: Write, warn: (message: st
 				}
 			}
 
-			// Nothing to read back for a parameter the receiver does not publish,
-			// so asking for verification would warn on every success.
+			// A row without a variable has nothing to read back. The two whose
+			// reading comes and goes with the pin mode do have one — `#poll()`
+			// knows to drop their check when they are out of view.
 			await write(controlParameter(setting, channel), value, Boolean(setting.variable))
 		},
 	}

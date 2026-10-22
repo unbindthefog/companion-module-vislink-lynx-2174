@@ -126,8 +126,11 @@ LNB fault, so there is no second reading to confirm it against.
 | `status_pin_mode`        | `Alarm` / `Manual` |
 | `status_pin_alarm_level` | `High` / `Low`     |
 
-The pin's current level has no variable: the receiver accepts a write to it but
-does not publish it in `data.xml`, so there is nothing to read back.
+The receiver reports exactly one of these two at a time, depending on the pin
+mode: `status_pin_state` while the mode is `Manual`, `status_pin_alarm_level`
+while it is `Alarm`. The other is empty. Both can be _set_ in either mode and
+the value sticks — it is only the reading that comes and goes, so a button for
+the one currently out of view will not turn green even though it worked.
 
 ### Alarms
 
@@ -216,7 +219,8 @@ a _setting is_ feedback and turns green while the receiver already holds that
 value, so a row of them reads at a glance as "this is the one we are on". Three
 kinds stay dark on purpose: preset recall, because the receiver only reports
 which slot is _selected_ and not which one is still in force; the status pin
-state, which the receiver does not report at all; and store and reboot, which
+state while the pin mode is `Alarm`, because the receiver only reports it in
+`Manual`; and store and reboot, which
 are red instead, because neither can be taken back.
 
 Lock buttons start red and turn green once the receiver reports lock, so a
@@ -253,7 +257,7 @@ edit once the button is on the page.
 | **Set overlay background**    | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                               |
 | **Set overlay colour**        | `White` or `Green`.                                                                                                             |
 | **Set status pin mode**       | Whether the status pin follows the alarm state or is driven by hand.                                                            |
-| **Set status pin state**      | Drives the pin directly. Only has an effect in `Manual` mode, and the receiver does not report it back.                         |
+| **Set status pin state**      | Drives the pin directly. Only has an effect — and is only reported back — in `Manual` mode.                                     |
 | **Set status pin level …**    | Which level the pin takes when an alarm is active.                                                                              |
 | **Set web ID**                | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered. |
 
@@ -273,13 +277,22 @@ before wondering why it stopped working. The same is true under read only,
 except there the connection list says `Read only`, which is at least a place to
 look.
 
+One thing not to do: press two buttons for the **same** setting in quick
+succession. `Set video input mode` takes about three seconds and reconfigures
+the decoder, and it does not simply lag — write three values with five seconds
+between them and the receiver settles on the _first_ one; with eight seconds,
+on the middle one. The last press does not reliably win. Set it once and let it
+be; the read-back will tell you if it did not take.
+
 Writes are read back. The receiver answers every write with `200` even when it
 discards the value, so the module polls again afterwards and logs a warning if
 the parameter still does not read what was set. Each parameter is tracked on
 its own, so pressing several buttons in quick succession does not cancel the
-earlier checks. Two writes have nothing to read back and are not checked: the
-momentary triggers (recall, store, reboot) reset themselves the moment the
-receiver acts, and the status pin state is absent from `data.xml`.
+earlier checks. The momentary triggers (recall, store, reboot) are not checked: they reset
+themselves the moment the receiver acts, so there is nothing to read back. The
+two status pin levels are checked when they are readable and left unchecked
+when the pin mode has put them out of view — absent is not the same as
+rejected.
 
 The value lists are the full sets the receiver accepts, not what it will take
 right now — it narrows them depending on the mode (in LMS-T it offers only

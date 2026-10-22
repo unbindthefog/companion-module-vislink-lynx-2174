@@ -121,10 +121,13 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
 - [x] Preset chain re-verified after the delta review (2026-10-22): slot 1
       recalled through the confirming path, and the receiver reports the slot
       zero-padded to three digits whatever is written
-- [ ] 17 of the 19 new actions are still untested on hardware. None of them
-      changes anything a read-back would not report, so this is a test gap
-      rather than a risk. `docs/HARDWARE_TESTS.md` says what each one needs —
-      signal, a downconverter, a monitor or a reference — and in what order
+- [x] Every value of every choice action written to the lab unit and read back
+      (2026-10-22): all accepted, lists verified against the device, nothing
+      left changed. What the sweep cannot show is whether an accepted value
+      takes effect — that still needs signal, a downconverter, a monitor or a
+      reference, per `docs/HARDWARE_TESTS.md`
+- [ ] Store preset and reboot are still untriggered: one overwrites a slot for
+      good, the other takes the unit off air.
 
 Deliberately left out: AES/BISS/EBS key material, licence entry,
 `DB_RESTORE_DEFAULTS` and the descrambling type (all refused in `api.ts`);

@@ -375,16 +375,19 @@ export const CONTROL_SETTINGS: readonly ControlSetting[] = [
 		id: 'status_pin_state',
 		actionId: 'set_status_pin_state',
 		optionId: 'value',
-		// The receiver accepts this but does not publish it in data.xml, so there
-		// is nothing to read back and nothing for a button to match against.
+		// Published only while the pin mode is Manual — the receiver swaps this
+		// and `DB_STATUS_PIN_ALARM_LEVEL` in and out of data.xml depending on the
+		// mode, so each is readable exactly when it is the one in effect. The
+		// write is accepted either way; it is the reading that comes and goes.
 		parameter: 'DB_STATUS_PIN_STATE',
-		variable: '',
+		variable: 'status_pin_state',
 		label: 'Status pin state (manual mode)',
 		caption: 'PINSET',
 		values: ['High', 'Low'],
 		section: 'unit',
 		keywords: ['status', 'pin', 'gpio', 'tally', 'high', 'low'],
-		description: 'Drives the pin directly. Only has an effect while the pin mode is Manual.',
+		description:
+			'Drives the pin directly. Only has an effect — and is only readable back — while the pin mode is Manual.',
 	},
 	{
 		id: 'status_pin_alarm_level',
@@ -397,6 +400,7 @@ export const CONTROL_SETTINGS: readonly ControlSetting[] = [
 		values: ['High', 'Low'],
 		section: 'unit',
 		keywords: ['status', 'pin', 'gpio', 'alarm', 'polarity'],
+		description: 'Readable only while the pin mode is Alarm; the write is taken in either mode.',
 	},
 ]
 
@@ -543,9 +547,10 @@ export function driftedControlIds(): string[] {
  * What the "setting is" feedback can compare against: one entry per control
  * that the receiver actually reports back, per-channel rows expanded.
  *
- * A row with no `variable` is left out on purpose. `DB_STATUS_PIN_STATE` is
- * writable but absent from `data.xml`, so there is nothing to match — and a
- * dropdown entry that can never go green is worse than none at all.
+ * A row with no `variable` is left out on purpose: there is nothing to match
+ * against, and a dropdown entry that can never go green is worse than none at
+ * all. Today every row has one — the trigger-style settings are not in this
+ * table to begin with.
  */
 /**
  * Readable settings that no action sets, but a hand-built feedback may still

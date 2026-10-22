@@ -742,3 +742,45 @@ nicht zum Wertebereich gehört. Für ein schreibendes Tool heißt das: die
 Wertelisten dürfen die vollen Mengen sein, aber **„angenommen" ist nicht
 dasselbe wie „wirksam"** — ob `Composite` auf Ausgang 1 tatsächlich am Stecker
 ankommt, ist damit nicht beantwortet.
+
+### `data.xml` führt nicht immer dieselben Parameter
+
+Der Parametersatz ist **nicht fest**. Mindestens ein Paar tauscht je nach
+Einstellung die Plätze — nachgewiesen am Laborgerät, 22.10.2026:
+
+| `DB_STATUS_PIN_MODE` | `DB_STATUS_PIN_STATE` | `DB_STATUS_PIN_ALARM_LEVEL` |
+| -------------------- | --------------------- | --------------------------- |
+| `Manual`             | vorhanden             | **fehlt**                   |
+| `Alarm`              | **fehlt**             | vorhanden                   |
+
+Geschrieben werden beide in jedem Modus und der Wert bleibt erhalten — nur
+lesen lässt sich jeweils der, der gerade gilt. Ein früherer Eintrag in diesem
+Dokument behauptete, `DB_STATUS_PIN_STATE` werde überhaupt nicht veröffentlicht;
+das stimmte nur, weil zum Zeitpunkt der Messung der Modus auf `Alarm` stand.
+
+Für ein schreibendes Tool heißt das: **„Parameter fehlt" ist nicht
+„Wert verworfen".** Wer nach einem Schreibvorgang gegenliest, muss die beiden
+Fälle trennen, sonst meldet er einen Fehler, den es nicht gibt.
+
+### Schnelle Folge von Schreibvorgängen auf denselben Parameter
+
+`DB_L2174_VIDEO_INPUT_MODE` braucht allein 3 s und löst eine Neukonfiguration
+des Decoders aus. Vier verschiedene Werte in kurzer Folge geschrieben, kam das
+Gerät nicht nach: Nach dem letzten Schreibvorgang (`HD MPEG2 LD`) stand es
+34 s später auf `SD MPEG2 LD` — einem Wert aus einem früheren Schritt.
+**Der letzte Schreibvorgang gewinnt also nicht zuverlässig.**
+
+Einzeln geschrieben, mit Ruhe davor, landet derselbe Wert in 3,1 s und bleibt.
+
+Nachgemessen mit Pausen — es reicht nicht, langsamer zu schreiben:
+
+| Pause zwischen drei Werten | Zustand nach 12 s Ruhe          |
+| -------------------------- | ------------------------------- |
+| 5 s                        | der **erste** der drei Werte    |
+| 8 s                        | der **mittlere** der drei Werte |
+
+Der Receiver bleibt also nicht nur zurück, er landet auf einem **beliebigen**
+der zuletzt geschriebenen Werte. Für ein schreibendes Tool heißt das: diesen
+Parameter nicht mehrfach kurz hintereinander setzen, und sich nicht darauf
+verlassen, dass der letzte Schreibvorgang gewinnt. Das Zurücklesen meldet den
+Fehlstand korrekt — es ist die einzige Instanz, die ihn bemerkt.

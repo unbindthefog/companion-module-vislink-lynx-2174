@@ -164,6 +164,21 @@ export const SAFE_PARAMETERS: ReadonlySet<string> = new Set([
 ])
 
 /**
+ * Parameters the receiver publishes only sometimes.
+ *
+ * `data.xml` does not carry a fixed set. The status pin's current level and the
+ * level it takes when alarmed swap places with `DB_STATUS_PIN_MODE`: whichever
+ * is in effect is readable, the other is simply not there. Both are written
+ * successfully in either mode — it is the reading that comes and goes.
+ *
+ * Listed here because "absent" then means "cannot be checked", not "rejected".
+ * Deliberately a short, named list rather than a rule about absence in general:
+ * a truncated or empty response would otherwise quietly cancel every pending
+ * check at once.
+ */
+export const CONDITIONAL_PARAMETERS: ReadonlySet<string> = new Set(['DB_STATUS_PIN_STATE', 'DB_STATUS_PIN_ALARM_LEVEL'])
+
+/**
  * Writes that interrupt the receiver, available only while the connection's
  * "guarded actions" switch is on.
  *
@@ -271,7 +286,16 @@ export class LynxApi {
 
 	async getParameters(): Promise<RawParameters> {
 		const body = await this.#get('/data.xml')
-		return parseParameters(body)
+		const params = parseParameters(body)
+		// An answer that parses to nothing is not an empty receiver, it is not
+		// data.xml — a truncated body, a captive portal, something else on that
+		// address. Treated as a failed read rather than as a successful poll that
+		// happens to know nothing, which would blank every variable and call the
+		// contact good at the same time.
+		if (Object.keys(params).length === 0) {
+			throw new Error('The answer to /data.xml contained no parameters')
+		}
+		return params
 	}
 
 	/**
