@@ -26,6 +26,10 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: Record<string, never>
 	}
+	genlock_failed: {
+		type: 'boolean'
+		options: Record<string, never>
+	}
 	alarm_active: {
 		type: 'boolean'
 		options: Record<string, never>
@@ -60,6 +64,7 @@ export type FeedbacksSchema = {
 export const ALL_FEEDBACKS = [
 	'channel_locked',
 	'video_locked',
+	'genlock_failed',
 	'alarm_active',
 	'power_threshold',
 	'mer_threshold',
@@ -182,6 +187,16 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			defaultStyle: OK_STYLE,
 			options: [],
 			callback: () => self.state.videoLocked === 'Locked',
+		},
+
+		genlock_failed: {
+			name: 'Frame lock (genlock) has failed',
+			type: 'boolean',
+			description:
+				'Red while the decoder reports a frame lock error. It reports OK while frame lock is switched off, so this only says something once genlock is set to SD or HD — which is the point: a reference that goes away is the kind of fault you otherwise notice in the picture, too late.',
+			defaultStyle: ALARM_STYLE,
+			options: [],
+			callback: () => self.state.genlockError === 'Fail',
 		},
 
 		alarm_active: {

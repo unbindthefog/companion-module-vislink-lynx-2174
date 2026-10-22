@@ -19,7 +19,7 @@ against that same receiver (all 39 variables populate correctly; see the
       power/MER/temperature/voltage threshold — each with a below/above
       direction rather than the comparison baked into the name
 - [x] Load the module into a real Companion instance and verify against the receiver
-- [x] Presets: 146 ready-made buttons in seven sections (Signal, Decoder,
+- [x] Presets: 151 ready-made buttons in seven sections (Signal, Decoder,
       Control — RF / Routing / Video / Unit, Unit)
 
 ### Verified against real hardware (2026-09-04)
@@ -98,12 +98,12 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       easily-reversible parameter (`DB_L2174_WEB_TEXT`) — done 2026-10-20 on
       "Rx Relais" (`10.81.5.149`), see `docs/LYNX_L2174_API.md` §6
 - [x] Decide which of the 88 GUI-writable parameters are safe and useful as
-      Companion actions — a two-tier allowlist in `src/api.ts`: 27 parameters
+      Companion actions — a two-tier allowlist in `src/api.ts`: 28 parameters
       are always writable, 8 more only with the connection's "interrupting
       actions" switch (preset recall/store, reboot, and the four downconverter
       supplies, which put DC on an antenna input), and everything else is
       refused whatever the switch says
-- [x] Implement — 28 actions, and one Control button per value for the 23 that
+- [x] Implement — 29 actions, and one Control button per value for the 24 that
       are a choice rather than a number, all built from one table
       (`src/controls.ts`). Preset recall, preset store and
       reboot are absent from the action list until the switch is on, rather
@@ -127,8 +127,8 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       takes effect — that still needs signal, a downconverter, a monitor or a
       reference, per `docs/HARDWARE_TESTS.md`
 - [x] Store preset and reboot triggered on the lab unit (2026-10-22), which
-      brings the actions pressed as a Companion button to 11 of 28 — the other
-      17 are covered on the parameter level by the sweep above, not through
+      brings the actions pressed as a Companion button to 11 of 29 — the other
+      18 are covered on the parameter level by the sweep above, not through
       their action. Store was tested without losing anything by
       recalling slot 16 first and writing the same contents back; reboot
       answers again after 20 s, not the minute the action used to claim, and
@@ -139,8 +139,8 @@ Deliberately left out: AES/BISS/EBS key material, licence entry,
 IP and network configuration (a wrong gateway and the unit is gone);
 downconverter type and LO frequency (tied to the hardware actually fitted, and
 a wrong value kills reception silently); the CCU and L1500 return path (not
-testable without a camera and a modem). `DB_L2174_SET_ALL` is a momentary
-trigger that copies channel 1 to all four — not in yet, undecided.
+testable without a camera and a modem). `DB_L2174_SET_ALL` turned out not to be a
+momentary trigger at all but a mode, and is now exposed — see the entry above.
 
 Read only (2026-10-22): a per-connection switch that empties the action list,
 drops the control presets and refuses the write in `src/api.ts` as well — the
@@ -149,10 +149,12 @@ called, which also retires the finding carried since `db46ba7`.
 
 Still open on the control side:
 
-- [ ] Decide how forgiving `settingMatches()` should be (`src/feedbacks.ts`
-      carries the `TODO(human)`)
+- [x] How forgiving `settingMatches()` is, decided 2026-10-22: whitespace and
+      case ignored, numbers compared as numbers. Safe only because no setting
+      offers two values that collide under those rules, which
+      `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      45 assertions in under a second, no device and no Companion. It pins what
+      75 assertions in under a second, no device and no Companion. It pins what
       each action writes — every row of the table, every value, all four
       channels — against a hand-written list of parameter names rather than
       against the table itself, so a typo there fails rather than agreeing with
@@ -161,7 +163,8 @@ Still open on the control side:
       `DB_DEMOD_RX_MODE` — fixed 2026-10-20 after the bench unit showed the two
       use different words for the same mode (`DVBT` against `DVB-T`). `rx_mode`
       is now the setting; `rx_mode_detected` is the demodulator's readout
-- [ ] Dropdown values are the full sets, hardcoded from `settings.xml`. The
+- [x] ~~Build the dropdown values per connection from `settings.xml`~~ —
+      dropped 2026-10-22, see below. Dropdown values are the full sets, hardcoded from `settings.xml`. The
       device also publishes which of them are selectable _right now_
       (`enabled="yes|no"`, and it changes with the receive mode), so the lists
       could be built per connection instead. Bigger change: `settings.xml` would

@@ -139,6 +139,8 @@ export const SAFE_PARAMETERS: ReadonlySet<string> = new Set([
 	'DB_DEMOD_ENABLE_2',
 	'DB_DEMOD_ENABLE_3',
 	'DB_DEMOD_ENABLE_4',
+	// Not a hardware risk itself, but it decides how far the others reach.
+	'DB_L2174_SET_ALL',
 
 	// Routing
 	'DB_DEMOD_ASI1_OUTPUT_MUX',

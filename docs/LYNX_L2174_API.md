@@ -855,3 +855,24 @@ abgesetzte zweite Wert vom Receiver verworfen — er blieb auf dem ersten stehen
 Von Hand ließ sich das nicht nachstellen, weil die Umschaltung dort jeweils in
 1 s fertig war. Die Entprellung verringert das Problem also, beseitigt es aber
 nicht; wer sichergehen will, lässt dem Gerät nach einem Moduswechsel Ruhe.
+
+### `DB_L2174_SET_ALL` ist kein Trigger, sondern ein Modus
+
+Die Parametertabelle führt ihn mit `No`/`Yes` wie einen Momentan-Trigger. Er ist
+keiner: Der Wert bleibt stehen (das Laborgerät stand auf `Yes`), und solange er
+`Yes` ist, wirkt ein Schreibvorgang auf einen **Downconverter-Parameter eines
+Kanals** auf alle **eingeschalteten** Kanäle.
+
+Gemessen am 22.10.2026:
+
+| `SET_ALL`    | geschrieben                                   | Ergebnis                                               |
+| ------------ | --------------------------------------------- | ------------------------------------------------------ |
+| `Yes`        | `DB_L2174_OTHER_LO_1 = 2.900000`              | alle vier LO-Werte auf 2.900000                        |
+| `Yes`        | `DB_L2174_LNB_PWR_1 = On`, Kanäle 2 und 3 aus | Speisung an auf Kanal **1 und 4**                      |
+| `Yes`        | `DB_L2174_LNB_PWR_1 = On`, alle vier an       | Speisung an auf **allen vier**                         |
+| `Yes` / `No` | `DB_DEMOD_ENABLE_2 = Off`                     | nur Kanal 2 — der Kanalschalter selbst ist ausgenommen |
+
+Für ein schreibendes Tool ist das sicherheitsrelevant: Wer „Speisung Kanal 1
+einschalten" anbietet, legt bei `SET_ALL=Yes` Gleichspannung auf **jeden
+aktiven Antenneneingang**. Der Parameter gehört deshalb sichtbar gemacht, nicht
+versteckt — dieses Modul führt ihn als `set_all_channels`.

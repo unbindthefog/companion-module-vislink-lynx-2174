@@ -6,7 +6,7 @@ Einschwingzeiten in `LYNX_L2174_API.md` §6 stehen.
 
 ## Zuerst: an welchem Gerät
 
-Das Modul schreibt inzwischen 35 Parameter. Vor dem ersten Tastendruck gehört
+Das Modul schreibt inzwischen 36 Parameter. Vor dem ersten Tastendruck gehört
 geklärt, **welcher** Receiver vor einem steht:
 
 | Gerät                                                           | Was erlaubt ist                |
@@ -55,14 +55,14 @@ Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
 | `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
 | `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
 
-Seit dem 22.10. gibt es zusätzlich `yarn test`: 45 Prüfungen ohne Gerät, die
+Seit dem 22.10. gibt es zusätzlich `yarn test`: 75 Prüfungen ohne Gerät, die
 festhalten, **was jede Action schreibt** — jede Tabellenzeile, jeder Wert, alle
 vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
 die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür
 sind die Abschnitte unten da.
 
-Damit sind **11 der 28 Actions** über eine Companion-Taste ausgelöst worden:
-die neun aus der Tabelle darüber plus Store und Reboot. Die übrigen 17 sind im
+Damit sind **11 der 29 Actions** über eine Companion-Taste ausgelöst worden:
+die neun aus der Tabelle darüber plus Store und Reboot. Die übrigen 18 sind im
 Sweep weiter unten **auf Parameterebene** geprüft — jeder Wert geschrieben und
 zurückgelesen —, aber nicht über ihre Action. Das ist der verbleibende
 Unterschied: Der Schreibpfad des Moduls ist für alle derselbe tabellengetriebene
@@ -167,13 +167,15 @@ Monitor an Ausgang 1 und 2, am besten mit Bild.
 
 ## 4. Was eine Referenz braucht
 
-| Action        | Werte           | Worauf achten                                                                                     |
-| ------------- | --------------- | ------------------------------------------------------------------------------------------------- |
-| `set_genlock` | `Off` `SD` `HD` | Geht `DB_DECOD_GEN_LOCK_ERROR` von `OK` auf `Fail`, wenn keine oder die falsche Referenz anliegt? |
+| Action        | Werte           | Worauf achten                                                                                                                                                                                                                                             |
+| ------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `set_genlock` | `Off` `SD` `HD` | Geht `DB_DECOD_GEN_LOCK_ERROR` von `OK` auf `Fail`, wenn keine oder die falsche Referenz anliegt? **Das Feedback `genlock_failed` ist seit 22.10. ausgeliefert, sein roter Zweig aber nie am Gerät gesehen** — ohne Referenz gibt es nichts zu verlieren. |
 
-Wenn `genlock_error` zuverlässig reagiert, ist das ein Feedback wert — Frame
-Lock ist genau die Art Fehler, die man im Bild erst bemerkt, wenn es zu spät
-ist.
+Frame Lock ist genau die Art Fehler, die man im Bild erst bemerkt, wenn es zu
+spät ist — deshalb gibt es das Feedback schon, bevor es am Gerät gesehen
+wurde. Reagiert `genlock_error` zuverlässig, ist der rote Zweig bestätigt;
+reagiert es nicht, muss das Feedback weg, statt eine Sicherheit zu behaupten,
+die es nicht hat.
 
 ## 5. Offen seit dem 22.10.: angenommen heißt nicht wirksam
 
@@ -226,7 +228,7 @@ Kein Vorgriff, nur die Stellen, an denen ein Testergebnis etwas am Modul ändern
 würde:
 
 - Strom unter Last brauchbar → Feedback und Ampel für die Speisung
-- `genlock_error` reagiert zuverlässig → Feedback, vielleicht in die Preset-Sektion „Decoder"
+- `genlock_error` reagiert zuverlässig → das ausgelieferte Feedback ist belegt; tut es das nicht, muss es wieder raus
 - Gerät lehnt Werte sichtbar ab → die Wertelisten könnten doch aus `settings.xml`
   je Verbindung geholt werden, statt die vollen Mengen zu führen (steht als
   offener Punkt in `ROADMAP.md`)

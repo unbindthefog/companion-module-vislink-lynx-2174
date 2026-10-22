@@ -26,12 +26,15 @@ import {
  */
 
 /** A stand-in for the module instance, recording what the actions ask for. */
-function stubInstance(config = {}) {
+function stubInstance(config = {}, settings = {}) {
 	const writes = []
 	const logs = []
 	let definitions = {}
 
 	return {
+		// What the last poll read back. Actions consult it to say what a press
+		// will actually reach, so it is part of their input, not decoration.
+		state: { settings },
 		config: { host: '10.0.0.1', port: 80, pollInterval: 2, readOnly: false, allowGuardedActions: false, ...config },
 		writes,
 		logs,
@@ -119,6 +122,7 @@ const EXPECTED_PARAMETERS = {
 	set_overlay_background: 'DB_DECOD_OVERLAY_BACKGROUND',
 	// Named ENABLE in the receiver's database, but it is the text colour.
 	set_overlay_colour: 'DB_DECOD_OVERLAY_ENABLE',
+	set_all_channels: 'DB_L2174_SET_ALL',
 	set_status_pin_mode: 'DB_STATUS_PIN_MODE',
 	set_status_pin_state: 'DB_STATUS_PIN_STATE',
 	set_status_pin_alarm_level: 'DB_STATUS_PIN_ALARM_LEVEL',
@@ -222,6 +226,52 @@ describe('the actions that are not a choice between fixed values', () => {
 
 		assert.deepEqual(self.writes, [])
 		assert.match(self.logs.at(-1).message, /empty web ID/)
+	})
+})
+
+describe('the downconverter supply says how far it reaches', () => {
+	it('names every enabled channel while the receiver applies settings to all', async () => {
+		const self = stubInstance(
+			{ allowGuardedActions: true },
+			{
+				set_all_channels: 'Yes',
+				channel_enable_1: 'On',
+				channel_enable_2: 'Off',
+				channel_enable_3: 'On',
+				channel_enable_4: 'On',
+			},
+		)
+		UpdateActions(self)
+		await self.definitions.set_lnb_power.callback({ options: { channel: '1', value: 'On' } })
+
+		const warned = self.logs.find((l) => l.message.includes('apply to all'))
+		assert.ok(warned, 'a press that reaches more than one channel has to say so')
+		assert.match(warned.message, /channel 1, 3, 4/, 'the disabled channel is not reached')
+	})
+
+	it('warns before the first poll, when the flag is not read back yet', async () => {
+		// The empty state is not "per channel", it is "not known yet" — and the
+		// receiver ships with the flag on, so silence here would be a guess in
+		// the dangerous direction.
+		const self = stubInstance({ allowGuardedActions: true }, {})
+		UpdateActions(self)
+		await self.definitions.set_lnb_power.callback({ options: { channel: '1', value: 'On' } })
+
+		const warned = self.logs.find((l) => l.message.includes('apply to all'))
+		assert.ok(warned, 'an unread flag still has to be said out loud')
+		assert.match(warned.message, /not read back yet/)
+		assert.match(warned.message, /channel 1, 2, 3, 4/)
+	})
+
+	it('stays quiet when the receiver applies settings per channel', async () => {
+		const self = stubInstance({ allowGuardedActions: true }, { set_all_channels: 'No', channel_enable_1: 'On' })
+		UpdateActions(self)
+		await self.definitions.set_lnb_power.callback({ options: { channel: '1', value: 'On' } })
+
+		assert.equal(
+			self.logs.find((l) => l.message.includes('apply to all')),
+			undefined,
+		)
 	})
 })
 

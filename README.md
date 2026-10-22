@@ -14,7 +14,7 @@ read-only, live in [`docs/LYNX_L2174_API.md`](docs/LYNX_L2174_API.md).
 > is refused in the client. Otherwise:
 >
 > **Writes are a short allowlist, not a free hand.** Of the 88 parameters the
-> receiver's own web interface can set, the module changes 27 for its everyday
+> receiver's own web interface can set, the module changes 28 for its everyday
 > actions and 8 more only when a per-connection switch is on: preset recall,
 > preset store, reboot, and the four downconverter supplies — the last of which
 > put DC on an antenna input, so the switch guards a hardware risk and not only

@@ -83,6 +83,18 @@ const VERIFY_WINDOW_MS = 25000
  */
 const CONFIRM_TIMEOUT_MS = 8000
 
+/**
+ * How long a press may wait its turn before it is dropped instead.
+ *
+ * The queue exists so that pressing a button twice lands on the second value,
+ * not so that a press survives an outage. Without a limit, a value left behind
+ * while the receiver was away goes out the moment contact returns — the device
+ * moves on its own, minutes after anyone asked, and the button that caused it
+ * is long forgotten. A minute is past the point where someone would still
+ * recognise the press as theirs.
+ */
+const QUEUED_MAX_AGE_MS = 60_000
+
 export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	config!: ModuleConfig
 
@@ -101,6 +113,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		channelMer: {} as Record<number, number | undefined>,
 		bestMer: undefined as number | undefined,
 		videoLocked: '',
+		genlockError: '',
 		alarmActive: false,
 		unitTemperature: undefined as number | undefined,
 		demodTemperature: undefined as number | undefined,
@@ -136,7 +149,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 * what someone wants is the value they pressed last, not every value they
 	 * passed through on the way.
 	 */
-	#queuedWrites = new Map<string, { value: string; verify: boolean }>()
+	#queuedWrites = new Map<string, { value: string; verify: boolean; queuedAt: number }>()
 	/**
 	 * Parameters whose write request is out but not yet answered.
 	 *
@@ -231,7 +244,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// `writeAndConfirm` runs its own confirmation and would otherwise poll
 		// for a value this method had quietly queued instead of sending.
 		if (verify && (this.#inFlight.has(name) || this.#pendingWrites.has(name))) {
-			this.#queuedWrites.set(name, { value, verify })
+			this.#queuedWrites.set(name, { value, verify, queuedAt: Date.now() })
 			this.log('debug', `${name} is still settling; ${value} will follow`)
 			return
 		}
@@ -393,9 +406,21 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		const queued = this.#queuedWrites.get(name)
 		if (!queued) return
 		this.#queuedWrites.delete(name)
-		void this.writeParameter(name, queued.value, queued.verify).catch((e) =>
-			this.log('error', `Could not set ${name}: ${e instanceof Error ? e.message : String(e)}`),
-		)
+
+		const waited = Date.now() - queued.queuedAt
+		if (waited > Math.max(QUEUED_MAX_AGE_MS, this.#verifyWindowMs())) {
+			this.log('info', `Not setting ${name} = ${queued.value}: it waited ${Math.round(waited / 1000)} s for its turn`)
+			return
+		}
+
+		void this.writeParameter(name, queued.value, queued.verify)
+			.then(() => {
+				// Said out loud when it was more than a moment, and only once it
+				// has happened: the receiver moves without anyone touching
+				// anything, and the log should be able to answer why.
+				if (waited > 5000) this.log('info', `${name} was held back ${Math.round(waited / 1000)} s before this`)
+			})
+			.catch((e) => this.log('error', `Could not set ${name}: ${e instanceof Error ? e.message : String(e)}`))
 	}
 
 	/** Stop waiting on everything — the receiver is gone or the address changed. */
@@ -410,7 +435,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// treats one dropped answer as ordinary, and so should a press that is
 		// waiting its turn.
 		for (const [name, queued] of this.#queuedWrites) {
-			this.log('debug', `Dropping queued ${name} = ${queued.value}: the connection moved`)
+			this.log('info', `Not setting ${name} = ${queued.value}: the connection was pointed elsewhere`)
 		}
 		this.#queuedWrites.clear()
 	}
@@ -606,6 +631,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		}
 
 		this.state.videoLocked = values.video_locked ?? ''
+		this.state.genlockError = values.genlock_error ?? ''
 		this.state.alarmActive = values.alarm_active === 'yes'
 		this.state.unitTemperature = toNumber(values.unit_temperature)
 		this.state.demodTemperature = toNumber(values.demod_fpga_temperature)
@@ -643,6 +669,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.state.channelMer = {}
 		this.state.bestMer = undefined
 		this.state.videoLocked = ''
+		this.state.genlockError = ''
 		this.state.alarmActive = false
 		this.state.unitTemperature = undefined
 		this.state.demodTemperature = undefined

@@ -234,6 +234,36 @@ export function UpdatePresets(self: ModuleInstance): void {
 		feedbacks: [unknownCover('unit')],
 	})
 
+	// Starts green because frame lock being fine is the normal case, and the
+	// receiver says OK while genlock is switched off as well. The second line
+	// shows which mode it is in, so "OK" and "not asked for" are told apart by
+	// reading rather than by guessing.
+	presets['genlock'] = monitorPreset({
+		name: 'Frame lock (genlock)',
+		keywords: ['genlock', 'frame', 'lock', 'reference', 'sync'],
+		style: { ...OK_STYLE, text: `GENLOCK\n$(${SELF}:genlock)`, size: '14' },
+		feedbacks: [
+			{ feedbackId: 'genlock_failed', options: {}, style: ALARM_STYLE, headline: 'Reference lost' },
+			// Grey while frame lock is switched off. The receiver reports OK in
+			// that state, and green there would claim health about something
+			// nobody asked for — the same mistake as a green reading with no
+			// contact behind it.
+			//
+			// Deliberately *after* the red one, so grey wins: a reference
+			// error on a switched-off genlock is nothing to alarm about. That
+			// rests on an untested assumption — `Fail` has never been seen on
+			// hardware — so if the receiver ever reports it while `Off`, this
+			// order is the thing to revisit.
+			{
+				feedbackId: 'setting_is',
+				options: { setting: 'genlock', value: 'Off' },
+				style: UNKNOWN_STYLE,
+				headline: 'Not in use',
+			},
+			unknownCover('unit'),
+		],
+	})
+
 	presets['audio_lock'] = monitorPreset({
 		name: 'Audio 1 + 2 lock',
 		keywords: ['audio', 'lock'],
@@ -475,7 +505,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		{
 			id: 'decoder',
 			name: 'Decoder',
-			definitions: ['video_lock', 'video_format', 'audio_lock'],
+			definitions: ['video_lock', 'video_format', 'genlock', 'audio_lock'],
 		},
 		// Under read-only there are no control buttons at all, so the four Control
 		// sections go with them — four empty headings say nothing the switch has

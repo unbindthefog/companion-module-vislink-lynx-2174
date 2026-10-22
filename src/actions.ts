@@ -60,6 +60,7 @@ export type ActionsSchema = {
 	set_overlay_type: ChoiceOptions
 	set_overlay_background: ChoiceOptions
 	set_overlay_colour: ChoiceOptions
+	set_all_channels: ChoiceOptions
 	set_status_pin_mode: ChoiceOptions
 	set_status_pin_state: ChoiceOptions
 	set_status_pin_alarm_level: ChoiceOptions
@@ -87,7 +88,12 @@ function lowerFirst(label: string): string {
  * value the receiver does not accept cannot reach `iframe.php` — which answers
  * 200 to anything and would otherwise swallow a typo silently.
  */
-function controlAction(setting: ControlSetting, write: Write, warn: (message: string) => void) {
+function controlAction(
+	setting: ControlSetting,
+	write: Write,
+	warn: (message: string) => void,
+	settings: () => Record<string, string | undefined>,
+) {
 	const channelOption = {
 		type: 'dropdown' as const,
 		id: 'channel',
@@ -128,6 +134,24 @@ function controlAction(setting: ControlSetting, write: Write, warn: (message: st
 				}
 			}
 
+			// Said at the moment it happens, not only in a description nobody
+			// re-reads: with the receiver's "apply to all" flag on — its shipped
+			// state — this reaches every enabled channel, so the press does more
+			// than the channel picker above it suggests.
+			// Unknown counts as on: the flag is only unknown before the first
+			// poll or after contact was lost, and the receiver ships with it
+			// set. Warning too often costs a line in the log; staying quiet
+			// costs voltage on a coax nobody meant to touch.
+			if (setting.widenedBySetAll && settings().set_all_channels !== 'No') {
+				const known = settings().set_all_channels === 'Yes'
+				const reached = CONTROL_CHANNELS.filter((n) => settings()[`channel_enable_${n}`] !== 'Off')
+				warn(
+					known
+						? `Downconverter power follows the receiver's "apply to all": this reaches channel ${reached.join(', ')}`
+						: `Downconverter power may follow the receiver's "apply to all" — not read back yet, and the receiver ships with it on, so assume this reaches channel ${reached.join(', ')}`,
+				)
+			}
+
 			// A row without a variable has nothing to read back. The two whose
 			// reading comes and goes with the pin mode do have one — `#poll()`
 			// knows to drop their check when they are out of view.
@@ -166,7 +190,8 @@ export function UpdateActions(self: ModuleInstance): void {
 	const definitions: Record<string, unknown> = {}
 
 	for (const setting of CONTROL_SETTINGS) {
-		definitions[setting.actionId] = setting.guarded && !guarded ? undefined : controlAction(setting, write, warn)
+		definitions[setting.actionId] =
+			setting.guarded && !guarded ? undefined : controlAction(setting, write, warn, () => self.state.settings)
 	}
 
 	// Typed separately from the loop above so the SDK still ties each option id

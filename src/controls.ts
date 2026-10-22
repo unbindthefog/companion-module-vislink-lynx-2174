@@ -68,6 +68,12 @@ export type ControlSetting = {
 	perChannel?: boolean
 	/** Only offered while the connection's interrupting-actions switch is on. */
 	guarded?: boolean
+	/**
+	 * The receiver's `DB_L2174_SET_ALL` flag widens this one past the channel
+	 * the button names. Carried on the row rather than matched by id in the
+	 * action builder, so a rename cannot drop the warning in silence.
+	 */
+	widenedBySetAll?: boolean
 	/** Shown under the action's name in Companion. */
 	description?: string
 	/** Overrides the generated "Set <label>" action name. */
@@ -157,9 +163,26 @@ export const CONTROL_SETTINGS: readonly ControlSetting[] = [
 		keywords: ['lnb', 'downconverter', 'power', 'dc', 'antenna'],
 		perChannel: true,
 		guarded: true,
+		widenedBySetAll: true,
 		actionName: 'Set downconverter power (feeds DC up the coax)',
 		description:
-			'Puts DC on that antenna input to feed a downconverter. Whatever is on the other end of the coax gets it, which is why this sits behind the switch.',
+			'Puts DC on an antenna input to feed a downconverter, and whatever is on the far end of that coax gets it — which is why this sits behind the switch. While "Apply channel settings to all" is Yes, as this receiver shipped, it reaches every enabled channel and not only the one chosen here.',
+	},
+
+	{
+		id: 'set_all_channels',
+		actionId: 'set_all_channels',
+		optionId: 'value',
+		parameter: 'DB_L2174_SET_ALL',
+		variable: 'set_all_channels',
+		label: 'Apply channel settings to all',
+		caption: 'SETALL',
+		values: ['No', 'Yes'],
+		section: 'rf',
+		keywords: ['all', 'channels', 'downconverter', 'together'],
+		actionName: 'Apply channel settings to all',
+		description:
+			'While this is Yes, setting a downconverter value on one channel sets it on every *enabled* channel — including the supply voltage. The bench unit shipped with it on.',
 	},
 
 	// ---- Routing -------------------------------------------------------
@@ -509,6 +532,7 @@ export const PUBLISHED_IDS: Partial<Record<keyof ActionsSchema, { option: string
 	set_overlay_type: { option: 'value', setting: 'overlay_type' },
 	set_overlay_background: { option: 'value', setting: 'overlay_background' },
 	set_overlay_colour: { option: 'value', setting: 'overlay_colour' },
+	set_all_channels: { option: 'value', setting: 'set_all_channels' },
 	set_status_pin_mode: { option: 'value', setting: 'status_pin_mode' },
 	set_status_pin_state: { option: 'value', setting: 'status_pin_state' },
 	set_status_pin_alarm_level: { option: 'value', setting: 'status_pin_alarm_level' },

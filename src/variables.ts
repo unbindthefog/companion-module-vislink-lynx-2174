@@ -38,6 +38,7 @@ export type VariablesSchema = ChannelVariables & {
 	asi_diversity: string
 	diversity_delay: string
 	spectral_polarity: string
+	set_all_channels: string
 	preset_slot: string
 	pre_ber: string
 	post_ber: string
@@ -100,6 +101,7 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 		asi_diversity: { name: 'ASI diversity input (On / Off)' },
 		diversity_delay: { name: 'Diversity delay (Off / Auto)' },
 		spectral_polarity: { name: 'Spectral polarity (Normal / Inverted / Auto)' },
+		set_all_channels: { name: 'Channel settings apply to all enabled channels (Yes / No)' },
 		preset_slot: { name: 'Selected preset slot (001-016)' },
 		pre_ber: { name: 'Pre-FEC bit error rate' },
 		post_ber: { name: 'Post-FEC bit error rate' },
@@ -197,6 +199,7 @@ export function buildVariableValues(params: RawParameters): Partial<VariablesSch
 		asi_diversity: str(params.DB_L2174_ASI_DIVERSITY),
 		diversity_delay: str(params.DB_DEMOD_DIV_DELAY),
 		spectral_polarity: str(params.DB_DEMOD_SPEC_POL),
+		set_all_channels: str(params.DB_L2174_SET_ALL),
 		preset_slot: str(params.DB_L2174_PRESET_NUM),
 		pre_ber: str(params.DB_DEMOD_PRE_BER),
 		post_ber: str(params.DB_DEMOD_POST_BER),

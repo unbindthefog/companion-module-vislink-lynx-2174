@@ -11,12 +11,12 @@ reach the receiver either, because the refusal also sits in the client. The
 connection list shows `Read only` while it is on. That is the right setting for
 a receiver that is on air.
 
-**What it may change**, when that switch is off. The module reads freely and writes only the 35
+**What it may change**, when that switch is off. The module reads freely and writes only the 36
 parameters its actions need — reception, routing, video output and the status
 pin. Everything else the receiver would accept is refused in the client itself,
 so a mistake cannot reach it: key material, licence entry, restoring defaults
 and the network configuration are never written, whatever the module is asked
-to do. Eight of the 35 are hidden until you switch them on per connection:
+to do. Eight of the 36 are hidden until you switch them on per connection:
 preset recall and store, reboot, and downconverter power (see Configuration).
 
 The receiver has no authentication: anything that can reach it on the network
@@ -65,6 +65,7 @@ There is nothing to configure about the transport — the receiver serves
 | `rf_fec`               | `2/3`                | read-only, likewise                            |
 | `rf_guard_interval`    | `Auto`               |                                                |
 | `spectral_polarity`    | `Normal`             |                                                |
+| `set_all_channels`     | `Yes` / `No`         | see the warning under Actions                  |
 | `pre_ber` / `post_ber` | `0`                  |                                                |
 | `asi_input_lock`       | `Locked` / `No Lock` |                                                |
 | `ip_input_lock`        | `Locked` / `No Lock` |                                                |
@@ -102,22 +103,22 @@ LNB fault, so there is no second reading to confirm it against.
 
 ### Decoder and camera control
 
-| Variable             | Example                           |
-| -------------------- | --------------------------------- |
-| `video_locked`       | `Locked` / `No Lock`              |
-| `video_format`       | `1080I/50`                        |
-| `video_input_mode`   | `H264` — the codec it expects     |
-| `genlock`            | `Off` / `SD` / `HD`               |
-| `genlock_error`      | `OK` / `Fail`                     |
-| `freeze_on_loss`     | `Freeze` / `Blue`                 |
-| `video_output_1`     | `SDI` / `SDI+Overlay`             |
-| `video_output_2`     | same, plus the composite variants |
-| `overlay_type`       | `Basic` / `Service`               |
-| `overlay_background` | `Off`, or `10`–`100`              |
-| `overlay_colour`     | `White` / `Green`                 |
-| `audio1_locked`      | `Locked` / `No Lock`              |
-| `audio2_locked`      | `Locked` / `No Lock`              |
-| `ccu_status`         | `Not Detected`                    |
+| Variable             | Example                                           |
+| -------------------- | ------------------------------------------------- |
+| `video_locked`       | `Locked` / `No Lock`                              |
+| `video_format`       | `1080I/50`                                        |
+| `video_input_mode`   | `H264` — the codec it expects                     |
+| `genlock`            | `Off` / `SD` / `HD`                               |
+| `genlock_error`      | `OK` / `Fail` — reports `OK` while genlock is off |
+| `freeze_on_loss`     | `Freeze` / `Blue`                                 |
+| `video_output_1`     | `SDI` / `SDI+Overlay`                             |
+| `video_output_2`     | same, plus the composite variants                 |
+| `overlay_type`       | `Basic` / `Service`                               |
+| `overlay_background` | `Off`, or `10`–`100`                              |
+| `overlay_colour`     | `White` / `Green`                                 |
+| `audio1_locked`      | `Locked` / `No Lock`                              |
+| `audio2_locked`      | `Locked` / `No Lock`                              |
+| `ccu_status`         | `Not Detected`                                    |
 
 ### Status pin
 
@@ -153,6 +154,10 @@ connection is healthy.
   lock. Use directly for a green "locked" button, or inverted for a red alarm
   button.
 - **Video decoder is locked** — true while the decoder reports video lock.
+- **Frame lock (genlock) has failed** — red while the decoder reports a frame
+  lock error. Note the receiver reports `OK` while genlock is switched _off_,
+  so this only says something once genlock is set to `SD` or `HD`. The
+  ready-made button greys itself out in the `Off` case for that reason.
 - **Any alarm is active** — red while the receiver's alarm bitfield reports at
   least one active condition.
 - **Channel power crosses threshold** — red when the chosen channel (or the
@@ -191,8 +196,8 @@ surely as too little. Its preset stacks four feedbacks: green from −6 to
 
 ## Presets
 
-The module ships 105 ready-made buttons you can drag straight onto a page, or
-146 with the interrupting actions switched on — and 21, the monitoring ones
+The module ships 110 ready-made buttons you can drag straight onto a page, or
+151 with the interrupting actions switched on — and 22, the monitoring ones
 alone, under read only.
 Monitoring first, then one button per value for everything the actions can set:
 
@@ -235,40 +240,41 @@ edit once the button is on the page.
 
 ## Actions
 
-| Action                        | Effect                                                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Set receive frequency**     | Retunes the demodulator. The link drops until the transmitter matches.                                                          |
-| **Set channel bandwidth**     | `2MHz`–`12MHz`, or `Auto`. Takes up to three seconds to apply — the slowest write on the unit.                                  |
-| **Set receive mode**          | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                         |
-| **Set decoder source**        | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                      |
-| **Set demodulator diversity** | On or off.                                                                                                                      |
-| **Set guard interval**        | `1/32`, `1/16`, `1/8`, `1/4` or `Auto`. Fixing it shortens acquisition.                                                         |
-| **Set spectral polarity**     | `Normal`, `Inverted` or `Auto`.                                                                                                 |
-| **Set channel enable**        | Takes one diversity input (1–4) in or out of the combination.                                                                   |
-| **Set ASI output source**     | What feeds the ASI output.                                                                                                      |
-| **Set IP output source**      | What feeds the IP output, or `Off`.                                                                                             |
-| **Set ASI diversity input**   | Whether the external ASI input joins the diversity combination.                                                                 |
-| **Set diversity delay**       | `Auto` lines up inputs arriving over different path lengths.                                                                    |
-| **Set video input mode**      | Which codec the decoder expects. The wrong one gives no picture, not a bad one.                                                 |
-| **Set frame lock (genlock)**  | `Off`, `SD` or `HD`. `genlock_error` says whether it took.                                                                      |
-| **Set on signal loss**        | What the output shows when the link drops: the last frame, or blue.                                                             |
-| **Set video output 1 / 2**    | `SDI` or `SDI+Overlay`; output 2 also does composite on units fitted for it.                                                    |
-| **Set overlay type**          | `Basic` or `Service`. Only visible on an output set to `+Overlay`.                                                              |
-| **Set overlay background**    | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                               |
-| **Set overlay colour**        | `White` or `Green`.                                                                                                             |
-| **Set status pin mode**       | Whether the status pin follows the alarm state or is driven by hand.                                                            |
-| **Set status pin state**      | Drives the pin directly. Only has an effect — and is only reported back — in `Manual` mode.                                     |
-| **Set status pin level …**    | Which level the pin takes when an alarm is active.                                                                              |
-| **Set web ID**                | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered. |
+| Action                            | Effect                                                                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Set receive frequency**         | Retunes the demodulator. The link drops until the transmitter matches.                                                          |
+| **Set channel bandwidth**         | `2MHz`–`12MHz`, or `Auto`. Takes up to three seconds to apply — the slowest write on the unit.                                  |
+| **Set receive mode**              | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                         |
+| **Set decoder source**            | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                      |
+| **Set demodulator diversity**     | On or off.                                                                                                                      |
+| **Set guard interval**            | `1/32`, `1/16`, `1/8`, `1/4` or `Auto`. Fixing it shortens acquisition.                                                         |
+| **Set spectral polarity**         | `Normal`, `Inverted` or `Auto`.                                                                                                 |
+| **Apply channel settings to all** | While `Yes`, a downconverter setting on one channel is applied to every _enabled_ channel. See the warning below.               |
+| **Set channel enable**            | Takes one diversity input (1–4) in or out of the combination.                                                                   |
+| **Set ASI output source**         | What feeds the ASI output.                                                                                                      |
+| **Set IP output source**          | What feeds the IP output, or `Off`.                                                                                             |
+| **Set ASI diversity input**       | Whether the external ASI input joins the diversity combination.                                                                 |
+| **Set diversity delay**           | `Auto` lines up inputs arriving over different path lengths.                                                                    |
+| **Set video input mode**          | Which codec the decoder expects. The wrong one gives no picture, not a bad one.                                                 |
+| **Set frame lock (genlock)**      | `Off`, `SD` or `HD`. `genlock_error` says whether it took.                                                                      |
+| **Set on signal loss**            | What the output shows when the link drops: the last frame, or blue.                                                             |
+| **Set video output 1 / 2**        | `SDI` or `SDI+Overlay`; output 2 also does composite on units fitted for it.                                                    |
+| **Set overlay type**              | `Basic` or `Service`. Only visible on an output set to `+Overlay`.                                                              |
+| **Set overlay background**        | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                               |
+| **Set overlay colour**            | `White` or `Green`.                                                                                                             |
+| **Set status pin mode**           | Whether the status pin follows the alarm state or is driven by hand.                                                            |
+| **Set status pin state**          | Drives the pin directly. Only has an effect — and is only reported back — in `Manual` mode.                                     |
+| **Set status pin level …**        | Which level the pin takes when an alarm is active.                                                                              |
+| **Set web ID**                    | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered. |
 
 With **interrupting actions** switched on, four more appear:
 
-| Action                      | Effect                                                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Recall preset**           | Loads a stored configuration — frequency, bandwidth, mode and routing change at once.                       |
-| **Store preset**            | Overwrites the chosen slot with the current settings. The previous contents are gone.                       |
-| **Reboot receiver**         | Answers again after about 20 s with its configuration intact; decoding takes longer.                        |
-| **Set downconverter power** | Puts DC on an antenna input (1–4) to feed a downconverter. Whatever is on the far end of that coax gets it. |
+| Action                      | Effect                                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Recall preset**           | Loads a stored configuration — frequency, bandwidth, mode and routing change at once.                           |
+| **Store preset**            | Overwrites the chosen slot with the current settings. The previous contents are gone.                           |
+| **Reboot receiver**         | Answers again after about 20 s with its configuration intact; decoding takes longer.                            |
+| **Set downconverter power** | Puts DC on an antenna input (1–4). Whatever is on the far end of that coax gets it — and see the warning below. |
 
 Switching the setting back off removes them from the list again, but a button
 that already carries one keeps it and goes quiet: pressing it does nothing
@@ -283,6 +289,13 @@ the decoder, and it does not simply lag — write three values with five seconds
 between them and the receiver settles on the _first_ one; with eight seconds,
 on the middle one. The last press does not reliably win. Set it once and let it
 be; the read-back will tell you if it did not take.
+
+**One per-channel setting is not per-channel.** The receiver has a flag,
+`DB_L2174_SET_ALL`, that makes a downconverter setting apply to every _enabled_
+channel rather than the one addressed — and the unit tested here shipped with it
+on. It is exposed as `Apply channel settings to all` so you can see and change
+it; while it is `Yes`, `Set downconverter power` for channel 1 energises every
+enabled channel, not only the one the button names. Channel enable itself is unaffected.
 
 Writes are read back. The receiver answers every write with `200` even when it
 discards the value, so the module polls again afterwards and logs a warning if
