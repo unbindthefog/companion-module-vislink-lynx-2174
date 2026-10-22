@@ -55,6 +55,12 @@ Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
 | `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
 | `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
 
+Seit dem 22.10. gibt es zusätzlich `yarn test`: 45 Prüfungen ohne Gerät, die
+festhalten, **was jede Action schreibt** — jede Tabellenzeile, jeder Wert, alle
+vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
+die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür
+sind die Abschnitte unten da.
+
 Damit sind **11 der 28 Actions** über eine Companion-Taste ausgelöst worden:
 die neun aus der Tabelle darüber plus Store und Reboot. Die übrigen 17 sind im
 Sweep weiter unten **auf Parameterebene** geprüft — jeder Wert geschrieben und

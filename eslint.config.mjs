@@ -12,9 +12,11 @@ export default [
 	},
 	...baseConfig,
 	{
-		// Development-only helpers. They are never packaged with the module, and
-		// the smoke test deliberately imports the built output in dist/.
-		files: ['tools/**/*.mjs'],
+		// Development-only helpers and the tests. Neither is packaged with the
+		// module, and both deliberately import the built output in dist/ — the
+		// tests because it is the built module Companion loads, so that is the
+		// thing worth asserting about.
+		files: ['tools/**/*.mjs', 'test/**/*.js'],
 		rules: {
 			'n/no-unpublished-import': 'off',
 		},

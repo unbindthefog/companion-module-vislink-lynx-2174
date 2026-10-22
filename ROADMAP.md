@@ -151,9 +151,12 @@ Still open on the control side:
 
 - [ ] Decide how forgiving `settingMatches()` should be (`src/feedbacks.ts`
       carries the `TODO(human)`)
-- [ ] No test setup in this repo at all. A hardware-free test over
-      `buildVariableValues`, `settingMatches` and the preset ids would cover
-      the fiddly parts (`'001'` against `1`, state cleared on contact loss)
+- [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
+      45 assertions in under a second, no device and no Companion. It pins what
+      each action writes — every row of the table, every value, all four
+      channels — against a hand-written list of parameter names rather than
+      against the table itself, so a typo there fails rather than agreeing with
+      itself. Also the two switches, the preset chains, and the backoff curve
 - [x] `set_rx_mode` wrote `DB_L2174_RX_MODE` while `rx_mode` read
       `DB_DEMOD_RX_MODE` — fixed 2026-10-20 after the bench unit showed the two
       use different words for the same mode (`DVBT` against `DVB-T`). `rx_mode`
