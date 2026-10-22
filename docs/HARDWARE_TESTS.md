@@ -97,14 +97,14 @@ die Warnung „still does not read …" erscheint.
 
 Monitor an Ausgang 1 und 2, am besten mit Bild.
 
-| Action                   | Werte                                      | Worauf achten                                                                             |
-| ------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `set_video_input_mode`   | `SD MPEG2 LD` `HD MPEG2 LD` `H264` `MPEG2` | Bei falschem Codec: schwarz, oder Standbild, oder Blue?                                   |
-| `set_video_output_1`     | `SDI` `SDI+Overlay`                        | Overlay erscheint/verschwindet                                                            |
-| `set_video_output_2`     | zusätzlich `Composite` `Comp+Overlay`      | Bietet das Gerät Composite überhaupt an? `settings.xml` sagt für Ausgang 1 nein, für 2 ja |
-| `set_overlay_type`       | `Basic` `Service`                          | Was steht jeweils drin                                                                    |
-| `set_overlay_background` | `Off` … `100`                              | Sichtbarer Unterschied zwischen den Stufen                                                |
-| `set_overlay_colour`     | `White` `Green`                            | —                                                                                         |
+| Action                   | Werte                                          | Worauf achten                                               |
+| ------------------------ | ---------------------------------------------- | ----------------------------------------------------------- |
+| `set_video_input_mode`   | `SD MPEG2 LD` `HD MPEG2 LD` `H264` `MPEG2`     | Bei falschem Codec: schwarz, oder Standbild, oder Blue?     |
+| `set_video_output_1`     | `SDI` `SDI+Overlay` `Composite` `Comp+Overlay` | Overlay erscheint/verschwindet; Composite siehe Abschnitt 5 |
+| `set_video_output_2`     | dieselben vier                                 | Gegenprobe zu Ausgang 1                                     |
+| `set_overlay_type`       | `Basic` `Service`                              | Was steht jeweils drin                                      |
+| `set_overlay_background` | `Off` … `100`                                  | Sichtbarer Unterschied zwischen den Stufen                  |
+| `set_overlay_colour`     | `White` `Green`                                | —                                                           |
 
 ## 4. Was eine Referenz braucht
 
@@ -116,26 +116,38 @@ Wenn `genlock_error` zuverlässig reagiert, ist das ein Feedback wert — Frame
 Lock ist genau die Art Fehler, die man im Bild erst bemerkt, wenn es zu spät
 ist.
 
-## 5. Preset-Kette, einmal durchspielen
+## 5. Offen seit dem 22.10.: angenommen heißt nicht wirksam
+
+Das Gerät nimmt `Composite` und `Comp+Overlay` für **Ausgang 1** an und meldet
+sie zurück, obwohl `settings.xml` sie dort als `enabled="no"` führt. Ob ein Bild
+am Stecker ankommt, sagt das Zurücklesen nicht.
+
+| Schritt                                                    | Erwartung        |
+| ---------------------------------------------------------- | ---------------- |
+| Monitor an Ausgang 1, `set_video_output_1` auf `Composite` | Bild oder nicht? |
+| dasselbe an Ausgang 2 (dort `enabled="yes"`)               | als Gegenprobe   |
+
+Fällt Ausgang 1 aus, gehört die Werteliste in `src/controls.ts` wieder auf zwei
+Werte gekürzt — dann **mit** diesem Beleg statt mit einer Vermutung.
+
+## 6. Preset-Kette, einmal durchspielen
 
 Die zweistufigen Preset-Actions haben sich nach dem Delta-Review geändert und
-sind seitdem **nicht mehr an Hardware gelaufen** — das Laborgerät war schon weg.
-Vorher wurde der zweite Schritt ausgelöst, sobald der erste abgeschickt war;
-jetzt wartet er, bis das Gerät den gewählten Slot zurückmeldet.
+liefen am 22.10.2026 wieder — Slot 1 über den bestätigenden Weg, und das
+Rückleseformat ist damit geklärt (siehe oben, immer dreistellig genullt).
 
-Zu prüfen ist deshalb beides: dass es noch funktioniert, und dass es bei einem
-**zweistelligen** Slot funktioniert. Beobachtet wurde bisher nur `001`.
+Offen bleibt der Recall eines Slots, dessen Inhalt niemand kennt:
 
-| Schritt                            | Erwartung                                                     |
-| ---------------------------------- | ------------------------------------------------------------- |
-| `recall_preset` auf Slot 1         | lädt wie bisher                                               |
-| `recall_preset` auf Slot **12**    | lädt; im Log kein „is not the slot the receiver has selected" |
-| `DB_L2174_PRESET_NUM` danach lesen | notieren, ob `012` oder `12` dort steht                       |
+| Schritt                                        | Erwartung                                                                |
+| ---------------------------------------------- | ------------------------------------------------------------------------ |
+| `recall_preset` auf einen belegten Slot ≠ 1    | lädt; im Log kein „is not the slot the receiver has selected"            |
+| danach `data.xml` gegen den Stand davor diffen | sehen, was der Slot enthält — **besonders, ob die IP-Adresse dabei ist** |
 
-Meldet das Gerät eine andere Schreibweise als erwartet, ist das kein Fehler —
-der Vergleich ist numerisch —, aber es gehört in `LYNX_L2174_API.md`.
+Der letzte Punkt ist der Grund, das nicht nebenbei zu machen: Enthält ein Preset
+eine abweichende IP, ist das Gerät danach nur noch über die Frontblende
+erreichbar.
 
-## 6. Nicht auf Sendung, und mit Ansage
+## 7. Nicht auf Sendung, und mit Ansage
 
 | Action                                                    | Warum                                                                                                                     |
 | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
@@ -158,5 +170,5 @@ würde:
 - Gerät lehnt Werte sichtbar ab → die Wertelisten könnten doch aus `settings.xml`
   je Verbindung geholt werden, statt die vollen Mengen zu führen (steht als
   offener Punkt in `ROADMAP.md`)
-- Composite an Ausgang 2 vorhanden → bestätigt die Bestückungs-Annahme in
-  `src/controls.ts` bei `video_output_1`
+- Composite kommt an Ausgang 1 wirklich heraus → die vier Werte dort bleiben;
+  kommt nichts, wird die Liste gekürzt, dann mit Beleg (Abschnitt 5)

@@ -118,6 +118,9 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       back to `Off`. No LNB Fault alarm either way, and the channel's current
       reading did not move — expected with no load. So the parameter is
       writable despite having no GUI page of its own
+- [x] Preset chain re-verified after the delta review (2026-10-22): slot 1
+      recalled through the confirming path, and the receiver reports the slot
+      zero-padded to three digits whatever is written
 - [ ] 17 of the 19 new actions are still untested on hardware. None of them
       changes anything a read-back would not report, so this is a test gap
       rather than a risk. `docs/HARDWARE_TESTS.md` says what each one needs —
@@ -146,7 +149,11 @@ Still open on the control side:
       device also publishes which of them are selectable _right now_
       (`enabled="yes|no"`, and it changes with the receive mode), so the lists
       could be built per connection instead. Bigger change: `settings.xml` would
-      have to be fetched and the action definitions rebuilt on connect
+      have to be fetched and the action definitions rebuilt on connect.
+      Measured 2026-10-22, and it lowers the value of doing so: that flag says
+      what the web interface offers, not what the receiver refuses. It accepted
+      a bandwidth the flag had disabled — 17 s later — and only a value the
+      parameter does not know at all (`Banane`) is dropped
 
 ## Publishing
 

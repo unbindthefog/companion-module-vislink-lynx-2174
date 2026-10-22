@@ -44,6 +44,36 @@ export function pollDelayMs(baseMs: number, consecutiveFailures: number): number
 
 export { UpgradeScripts }
 
+/**
+ * How long to wait before saying a write did not take.
+ *
+ * Measured on the bench unit, 22.10.2026: an ordinary parameter reads back in
+ * about 1.5 s, but a receive-mode change takes **20 s**, and a bandwidth change
+ * that follows one takes 17 s — the receiver re-acquires before it publishes
+ * the new value. The settling times in docs §6 were measured within one mode
+ * and are the short case, not the worst one.
+ *
+ * Generous on purpose. The warning is a diagnostic, not the feedback that
+ * matters: a button that did not take stays un-green from the next poll
+ * onwards, which is immediate and visible. A warning that comes late costs
+ * little; one that accuses the receiver of rejecting a write it accepted sends
+ * someone looking for a fault that is not there.
+ *
+ * A floor, not the whole answer — the confirmation can only arrive on a poll,
+ * so `#verifyWindowMs()` stretches it for connections polling slowly.
+ */
+const VERIFY_WINDOW_MS = 25000
+
+/**
+ * How long `writeAndConfirm` waits for a read-back before giving up.
+ *
+ * Shorter than the window above because its one caller selects a preset slot,
+ * which is a selection and not a reconfiguration — measured at about 1 s. Kept
+ * at eight for headroom: too long here means a button that feels stuck, and
+ * too short means an action that refuses to do anything.
+ */
+const CONFIRM_TIMEOUT_MS = 8000
+
 export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	config!: ModuleConfig
 
@@ -152,7 +182,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 * The receiver rewrites data.xml on its own one-second timer, so a poll
 	 * straight after the write would still read the old value. Waiting for that
 	 * tick and then polling means the button reflects what it just did, instead
-	 * of lagging until the next scheduled poll.
+	 * of lagging until the next scheduled poll. For the two slow parameters —
+	 * receive mode, and bandwidth right after a mode change — even that is not
+	 * enough, which is what the third catch-up poll below is for.
 	 */
 	async writeParameter(name: string, value: string, verify = true): Promise<void> {
 		const api = this.#api
@@ -185,13 +217,15 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			this.#armVerifyTimer(name, value, true)
 		}
 
-		// Measured on the bench: the receiver takes between 0.3 s and 3 s to
-		// apply a write and publish it in data.xml, depending on the parameter —
-		// changing the channel bandwidth is the slow one. Poll twice rather than
-		// guess a single delay: the early one keeps the button feeling immediate,
-		// the later one catches whatever had not settled yet.
+		// Measured on the bench: most parameters read back in about 1.5 s, but a
+		// receive-mode change takes around 20 s and a bandwidth change following
+		// one about 17 — the receiver re-acquires first. Three catch-up polls
+		// rather than one guessed delay: the first two keep an ordinary button
+		// feeling immediate, the third is there for the slow pair, so they do not
+		// have to wait for the next scheduled poll to turn green.
 		setTimeout(() => void this.#poll(), 1200)
 		setTimeout(() => void this.#poll(), 3500)
+		setTimeout(() => void this.#poll(), 21000)
 	}
 
 	/**
@@ -211,9 +245,21 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 				return
 			}
 			this.log('warn', `${name} still does not read ${JSON.stringify(value)} — the receiver may have rejected it`)
-		}, 4500)
+		}, this.#verifyWindowMs())
 		timer.unref?.()
 		this.#pendingWrites.set(name, { value, timer })
+	}
+
+	/**
+	 * How long to wait before warning, for this connection's poll interval.
+	 *
+	 * The read-back can only arrive on a poll. At the default two seconds the
+	 * fixed window is far longer than it needs to be, but a connection set to
+	 * poll every 60 s would otherwise be warned at 25 s — before the poll that
+	 * would have confirmed the write had even run.
+	 */
+	#verifyWindowMs(): number {
+		return Math.max(VERIFY_WINDOW_MS, this.#pollIntervalMs * 2 + 5000)
 	}
 
 	/**
@@ -228,7 +274,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		name: string,
 		value: string,
 		matches: (reading: string | undefined) => boolean = (reading) => reading === value,
-		timeoutMs = 4000,
+		timeoutMs = CONFIRM_TIMEOUT_MS,
 	): Promise<boolean> {
 		// No verify timer: the loop below is the better check, and arming both
 		// would warn twice about one rejected write — the second time long after
@@ -243,7 +289,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// The receiver republishes data.xml on its own one-second timer, so there
 		// is nothing to gain from asking faster than that.
 		while (Date.now() < deadline) {
-			await new Promise((resolve) => setTimeout(resolve, 900))
+			// Capped at the deadline so a slow read cannot stretch the wait well
+			// past it — the receiver's own republish interval is one second, so
+			// there is nothing to gain from asking faster.
+			await new Promise((resolve) => setTimeout(resolve, Math.min(900, Math.max(0, deadline - Date.now()))))
 			if (this.#connectedTo !== target) return false
 			try {
 				const params = await api.getParameters()

@@ -497,6 +497,10 @@ Diese beiden Felder entsprechen 1:1 den GUI-Seiten „DEMOD“ und „DECODER“
 > Neukonfiguration. Wer nach einem Schreibzugriff gegenliest, muss mit bis zu
 > drei Sekunden rechnen — das Modul pollt deshalb zweistufig nach.
 >
+> **Nachtrag 22.10.2026**: Diese Zeiten sind der kurze Fall, gemessen innerhalb
+> eines Modus. Ein Moduswechsel braucht rund 20 s — siehe „Einschwingzeiten,
+> zweite Messung" am Ende dieses Dokuments.
+>
 > **Gegen produktive Geräte gilt weiterhin Zurückhaltung**: `iframe.php`
 > antwortet auch dann mit `200`, wenn es den Wert verwirft, und die
 > geräteseitige Prüfung `check_for_invalid_setting_attempt` ist hier inert
@@ -706,3 +710,35 @@ Beobachtet wurde allerdings nur Slot 1. Ob das Gerät bei zweistelligen Slots
 Die Begründung ist die Tragweite: seit dieser Vergleich darüber entscheidet, ob
 Preset-Recall und -Store überhaupt auslösen, würde eine abweichende Schreibweise
 beide Actions dauerhaft stummschalten, mit einer einzigen Warnzeile als Hinweis.
+
+### Einschwingzeiten, zweite Messung (22.10.2026)
+
+Die Werte in Abschnitt 6 (335–2982 ms) sind der **kurze** Fall. Nachgemessen am
+selben Laborgerät, jeweils bis der Wert in `data.xml` steht:
+
+| Schreibvorgang                                                                         | Dauer     |
+| -------------------------------------------------------------------------------------- | --------- |
+| gewöhnlicher Parameter (`DB_DECOD_FREEZE_ON_LOSS`, `DB_L2174_CHAN_BW` im selben Modus) | ~1,5 s    |
+| `DB_L2174_RX_MODE`                                                                     | **~20 s** |
+| `DB_L2174_CHAN_BW` direkt nach einem Moduswechsel                                      | **~17 s** |
+| `DB_L2174_PRESET_NUM` (nur Auswahl)                                                    | ~1 s      |
+
+Der Receiver akquiriert offenbar neu, bevor er den neuen Wert veröffentlicht.
+Wer nach einem Schreibvorgang gegenliest, muss deshalb mit **mehr als 20 s**
+rechnen, nicht mit drei. Das Modul wartet entsprechend
+(`VERIFY_WINDOW_MS` in `src/main.ts`).
+
+### Was das Gerät annimmt und was nicht
+
+| Fall                                                                  | Ergebnis                          |
+| --------------------------------------------------------------------- | --------------------------------- |
+| Wert außerhalb der aktuell `enabled`-Liste (`10MHz` in LMST(S))       | **angenommen**, nach 17 s         |
+| Wert mit `enabled="no"` in `settings.xml` (`Composite` auf Ausgang 1) | **angenommen**, sofort            |
+| Wert, den der Parameter gar nicht kennt (`Banane` für Freeze-on-Loss) | **verworfen**, Wert bleibt stehen |
+
+`enabled="yes|no"` in `settings.xml` beschreibt also, was die Weboberfläche
+gerade anbietet — nicht, was das Gerät verweigert. Verweigert wird nur, was
+nicht zum Wertebereich gehört. Für ein schreibendes Tool heißt das: die
+Wertelisten dürfen die vollen Mengen sein, aber **„angenommen" ist nicht
+dasselbe wie „wirksam"** — ob `Composite` auf Ausgang 1 tatsächlich am Stecker
+ankommt, ist damit nicht beantwortet.

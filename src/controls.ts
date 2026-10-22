@@ -16,11 +16,15 @@
  * log, not a button press mid-show.
  *
  * Values come from the device's own `settings.xml`, read on the bench unit
- * (10.81.5.149, "Rx Relais", V1039). One catch learned there: `settings.xml`
- * marks options `enabled="no"` when the *current* configuration rules them out,
- * not when the receiver cannot do them — in LMST(S) mode it offered only
- * 6/7/8 MHz while the receiver itself was sitting on 10 MHz. So these lists are
- * the full sets, not a snapshot of what was selectable at the time.
+ * (10.81.5.149, "Rx Relais", V1039), and they are the full sets rather than a
+ * snapshot of what was selectable at the time.
+ *
+ * `enabled="no"` turned out to mean less than it looks. It marks what the web
+ * interface offers right now, not what the receiver refuses: in LMST(S) the
+ * bandwidth list showed only 6/7/8 MHz, and the receiver accepted 10 MHz
+ * anyway — it just took 17 seconds to say so. The one thing it does refuse is
+ * a value that is not a value at all; `Banane` for a two-option parameter was
+ * dropped silently, which is what the read-back check is there to catch.
  */
 
 import type { ActionsSchema } from './actions.js'
@@ -285,11 +289,13 @@ export const CONTROL_SETTINGS: readonly ControlSetting[] = [
 		variable: 'video_output_1',
 		label: 'Video output 1 format',
 		caption: 'OUT1',
-		// Two values where output 2 has four: on the bench unit `settings.xml`
-		// marked Composite and Comp+Overlay `enabled="no"` for output 1 and `yes`
-		// for output 2 at the same moment, which is a difference in what is
-		// fitted rather than one that depends on the current mode.
-		values: ['SDI', 'SDI+Overlay'],
+		// Same four as output 2. `settings.xml` marks the composite pair
+		// `enabled="no"` here, and the first reading of that was "this unit is
+		// not fitted for it" — but the receiver accepts the write and reports
+		// `Composite` back (bench, 22.10.2026), so `enabled` is what the web
+		// interface offers, not what the device refuses. Whether a picture
+		// actually leaves the connector is open; see docs/HARDWARE_TESTS.md.
+		values: ['SDI', 'SDI+Overlay', 'Composite', 'Comp+Overlay'],
 		section: 'video',
 		keywords: ['output', 'sdi', 'overlay'],
 	},

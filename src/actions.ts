@@ -306,7 +306,10 @@ async function selectPresetSlot(self: ModuleInstance, raw: unknown): Promise<boo
 		return false
 	}
 
-	self.log('warn', `Preset ${slot} is not the slot the receiver has selected — not touching it`)
+	// Deliberately not "the receiver selected something else": we do not know
+	// that. What we know is that it did not confirm, which a slow re-acquisition
+	// can cause just as well as a refusal.
+	self.log('warn', `Could not confirm preset slot ${slot} — not triggering anything`)
 	return false
 }
 
