@@ -8,6 +8,42 @@ export type LynxApiOptions = {
 	host: string
 	port: number
 	timeoutMs: number
+	/** Whether this connection may write at all. False turns the client into a reader. */
+	allowWrites: boolean
+	/** Whether the interrupting writes in GUARDED_PARAMETERS are permitted. */
+	allowGuardedWrites: boolean
+}
+
+/**
+ * Who is it that does not know?
+ *
+ * A receiver that does not answer is a confirmed fault — something is wrong
+ * with the receiver. But when the failure is our own end having no way there
+ * (no route, no interface, no free local port), the receiver's state is simply
+ * unknown to us, and reporting that as a fault sends people looking in the
+ * wrong place. The distinction is already present in the error code; it just
+ * needs to survive the trip to the feedbacks.
+ *
+ * Carried but not yet acted on: `readingIsUnknown` currently greys both cases
+ * alike. The groundwork is here for the day that distinction earns its own
+ * colour.
+ */
+export type ContactFailure = 'no-path-from-here' | 'receiver-not-answering'
+
+export function classifyFailure(code: string | undefined): ContactFailure {
+	switch (code) {
+		case 'EHOSTUNREACH':
+		case 'ENETUNREACH':
+		case 'EADDRNOTAVAIL':
+		case 'EADDRINUSE':
+		case 'ENOTFOUND':
+			// Our machine cannot even pose the question.
+			return 'no-path-from-here'
+		default:
+			// ETIMEDOUT, ECONNREFUSED, ECONNRESET, EHOSTDOWN: the question was
+			// asked and the receiver did not answer properly.
+			return 'receiver-not-answering'
+	}
 }
 
 /**
@@ -18,7 +54,9 @@ function friendlyError(err: NodeJS.ErrnoException, host: string, path: string): 
 		case 'ENOTFOUND':
 			return `Host not found (${host})`
 		case 'ECONNREFUSED':
-			return `Connection refused by ${host} — is the port correct?`
+			// Not only a wrong port: a receiver that is restarting refuses for
+			// about a second and a half before its web server is up again.
+			return `Nothing is listening on ${host} — the receiver may be restarting, or the port may be wrong`
 		case 'EHOSTUNREACH':
 		case 'ENETUNREACH':
 			return `Host unreachable (${host}) — check network/VLAN`
@@ -67,6 +105,107 @@ export function parseParameters(xml: string): RawParameters {
  * same approach as the Sapphire RXD4 module, even though this device has no
  * TLS and no REST API to speak of.
  */
+/**
+ * The only parameters this module will ever write.
+ *
+ * A denylist was the first instinct and the wrong shape. The receiver defines
+ * 290 parameters, accepts writes to any of them without authentication, and its
+ * own guard (`check_for_invalid_setting_attempt`) is inherited from a different
+ * Vislink product and does nothing here. A list of forbidden names therefore
+ * permits everything nobody thought of — and something had indeed not been
+ * thought of: `DB_DECOD_COMMAND` offers a `Reboot` option, reaching exactly what
+ * blocking `DB_L2174_REBOOT` was meant to prevent. `DB_IP_ADDRESS` is worse than
+ * a reboot; a reboot comes back.
+ *
+ * Inverted, the failure mode inverts with it: a parameter nobody listed is
+ * refused instead of obeyed. Adding one is then a deliberate act.
+ *
+ * Names are matched trimmed and upper-cased, so a stray space cannot slip past.
+ *
+ * What is absent is absent on purpose: restoring defaults wipes the
+ * configuration, licence and key entry can break the licensing, and
+ * `DB_IP_ADDRESS` takes the receiver off the network in a way only someone
+ * standing in front of it can undo. None of those belong on a button, so they
+ * are simply not listed — which under an allowlist is all it takes.
+ */
+export const SAFE_PARAMETERS: ReadonlySet<string> = new Set([
+	// RF
+	'DB_L2174_FREQ1',
+	'DB_L2174_CHAN_BW',
+	'DB_L2174_RX_MODE',
+	'DB_DEMOD_GUARD_INT',
+	'DB_DEMOD_SPEC_POL',
+	'DB_DEMOD_ENABLE_1',
+	'DB_DEMOD_ENABLE_2',
+	'DB_DEMOD_ENABLE_3',
+	'DB_DEMOD_ENABLE_4',
+
+	// Routing
+	'DB_DEMOD_ASI1_OUTPUT_MUX',
+	'DB_DEMOD_ASI2_OUTPUT_MUX',
+	'DB_DEMOD_IP1_OUTPUT_MUX',
+	'DB_L2174_DEMOD_DIVERSITY',
+	'DB_L2174_ASI_DIVERSITY',
+	'DB_DEMOD_DIV_DELAY',
+
+	// Video
+	'DB_L2174_VIDEO_INPUT_MODE',
+	'DB_DECOD_GEN_LOCK',
+	'DB_DECOD_FREEZE_ON_LOSS',
+	'DB_DECOD_VIDEO_A_TYPE',
+	'DB_DECOD_VIDEO_B_TYPE',
+	'DB_DECOD_OVERLAY_TYPE',
+	'DB_DECOD_OVERLAY_BACKGROUND',
+	'DB_DECOD_OVERLAY_ENABLE',
+
+	// Unit
+	'DB_STATUS_PIN_MODE',
+	'DB_STATUS_PIN_STATE',
+	'DB_STATUS_PIN_ALARM_LEVEL',
+	'DB_L2174_WEB_TEXT',
+])
+
+/**
+ * Parameters the receiver publishes only sometimes.
+ *
+ * `data.xml` does not carry a fixed set. The status pin's current level and the
+ * level it takes when alarmed swap places with `DB_STATUS_PIN_MODE`: whichever
+ * is in effect is readable, the other is simply not there. Both are written
+ * successfully in either mode — it is the reading that comes and goes.
+ *
+ * Listed here because "absent" then means "cannot be checked", not "rejected".
+ * Deliberately a short, named list rather than a rule about absence in general:
+ * a truncated or empty response would otherwise quietly cancel every pending
+ * check at once.
+ */
+export const CONDITIONAL_PARAMETERS: ReadonlySet<string> = new Set(['DB_STATUS_PIN_STATE', 'DB_STATUS_PIN_ALARM_LEVEL'])
+
+/**
+ * Writes that interrupt the receiver, available only while the connection's
+ * "guarded actions" switch is on.
+ *
+ * Recalling a preset reconfigures the whole receiver at once and a reboot takes
+ * it away for about twenty seconds — both are legitimate remote-hands
+ * operations and both
+ * are the wrong thing to hit by accident mid-show. The switch is off by default,
+ * and while it is off these actions are not offered at all rather than offered
+ * and ignored.
+ */
+export const GUARDED_PARAMETERS: ReadonlySet<string> = new Set([
+	// Puts DC on an antenna input. Whatever is on the far end of that coax gets
+	// it, so this is a hardware risk rather than only an interruption — the one
+	// thing behind this switch that is not about going off air.
+	'DB_L2174_LNB_PWR_1',
+	'DB_L2174_LNB_PWR_2',
+	'DB_L2174_LNB_PWR_3',
+	'DB_L2174_LNB_PWR_4',
+
+	'DB_L2174_PRESET_NUM',
+	'DB_L2174_PRESET_RECALL',
+	'DB_L2174_PRESET_STORE',
+	'DB_L2174_REBOOT',
+])
+
 export class LynxApi {
 	#options: LynxApiOptions
 	#log: ApiLogger
@@ -105,16 +244,75 @@ export class LynxApi {
 	}
 
 	/** GET `/data.xml` and return it parsed into a flat name → value map. */
-	async getParameters(): Promise<RawParameters> {
-		const body = await this.#get('/data.xml')
-		return parseParameters(body)
+	/**
+	 * Set one parameter.
+	 *
+	 * The receiver's write path is a GET with a query string — the same shape as
+	 * a read, which is precisely why the refusal above sits here rather than
+	 * being left to callers to remember.
+	 */
+	async setParameter(name: string, value: string): Promise<void> {
+		const key = name.trim().toUpperCase()
+		const path = `/common/iframe.php?param=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`
+
+		// Refused here, and then again when the request actually leaves — see
+		// `#refuseWrite`. Checking only at this point would let a press that is
+		// already sitting in the queue go out after the connection has been set
+		// to read only, or after it has been pointed at a different receiver.
+		const refusal = this.#refuseWrite(key)
+		if (refusal) throw new Error(`Refusing to write ${name}: ${refusal}`)
+
+		await this.#get(path, () => {
+			const late = this.#refuseWrite(key)
+			if (late) throw new Error(`Refusing to write ${name}: ${late}`)
+			// The receiver this write was meant for. Between the press and the
+			// request leaving, the connection can have been pointed somewhere
+			// else, and the value would land on a receiver nobody aimed at.
+			return `${this.#options.host}:${this.#options.port}`
+		})
 	}
 
-	async #get(path: string): Promise<string> {
-		const request = this.#queue.then(
-			async () => this.#run(path),
-			async () => this.#run(path),
-		)
+	/**
+	 * Why this parameter may not be written, or `undefined` if it may.
+	 *
+	 * Three guards, outermost first. Read-only is a statement about the receiver
+	 * rather than about the parameter, so it comes before the allowlist: with it
+	 * on there is no parameter this connection may change.
+	 */
+	#refuseWrite(key: string): string | undefined {
+		if (!this.#options.allowWrites) return 'this connection is set to read only'
+		if (SAFE_PARAMETERS.has(key)) return undefined
+		if (!GUARDED_PARAMETERS.has(key)) return 'not one of the parameters this module may change'
+		if (!this.#options.allowGuardedWrites) return 'enable "guarded actions" in the connection config first'
+		return undefined
+	}
+
+	async getParameters(): Promise<RawParameters> {
+		const body = await this.#get('/data.xml')
+		const params = parseParameters(body)
+		// An answer that parses to nothing is not an empty receiver, it is not
+		// data.xml — a truncated body, a captive portal, something else on that
+		// address. Treated as a failed read rather than as a successful poll that
+		// happens to know nothing, which would blank every variable and call the
+		// contact good at the same time.
+		if (Object.keys(params).length === 0) {
+			throw new Error('The answer to /data.xml contained no parameters')
+		}
+		return params
+	}
+
+	/**
+	 * Queue a request. `beforeSend` runs once this request is the one going out.
+	 *
+	 * That is the only moment at which "may this happen, and to whom" can be
+	 * answered honestly: the queue is serial and a slow receiver can hold a
+	 * request behind a poll for as long as the socket timeout, which is ample
+	 * time for someone to change the connection's mind. It returns the target
+	 * it checked against, so `#run` cannot read a newer one.
+	 */
+	async #get(path: string, beforeSend?: () => string): Promise<string> {
+		const run = async () => this.#run(path, beforeSend?.())
+		const request = this.#queue.then(run, run)
 
 		// Keep the queue alive even if a caller lets the rejection propagate.
 		this.#queue = request.catch(() => undefined)
@@ -122,10 +320,16 @@ export class LynxApi {
 		return request
 	}
 
-	async #run(path: string): Promise<string> {
+	async #run(path: string, checkedTarget?: string): Promise<string> {
 		const { host, port, timeoutMs } = this.#options
 
 		if (!host) throw new Error('No receiver address configured')
+		// Belt and braces: `beforeSend` has just read these, so a mismatch would
+		// mean they changed inside this tick, which they cannot. Cheap enough to
+		// keep as the thing that makes the guarantee local to the send.
+		if (checkedTarget !== undefined && checkedTarget !== `${host}:${port}`) {
+			throw new Error('Refusing to write: the connection was pointed at a different receiver')
+		}
 
 		this.#pending++
 		try {

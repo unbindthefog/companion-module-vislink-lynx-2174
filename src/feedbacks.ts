@@ -1,5 +1,5 @@
 import type ModuleInstance from './main.js'
-import { CHANNEL_IDS } from './types.js'
+import { CHANNEL_IDS, SETTING_SOURCES, type SettingId } from './types.js'
 
 /** Which side of the threshold counts as an alarm. Shared by every threshold feedback. */
 type ThresholdDirection = 'below' | 'above'
@@ -46,6 +46,14 @@ export type FeedbacksSchema = {
 		type: 'boolean'
 		options: { direction: ThresholdDirection; threshold: number }
 	}
+	reading_unknown: {
+		type: 'boolean'
+		options: { source: string }
+	}
+	setting_is: {
+		type: 'boolean'
+		options: { setting: SettingId; value: string }
+	}
 }
 
 /** Every feedback id, so a poll can re-evaluate the lot without listing them twice. */
@@ -57,6 +65,8 @@ export const ALL_FEEDBACKS = [
 	'mer_threshold',
 	'temperature_threshold',
 	'voltage_threshold',
+	'reading_unknown',
+	'setting_is',
 ] as const satisfies ReadonlyArray<keyof FeedbacksSchema>
 
 /**
@@ -68,6 +78,61 @@ export const ALARM_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
 export const OK_STYLE = { bgcolor: 0x00c000, color: 0x000000 }
 export const WARNING_STYLE = { bgcolor: 0xff8000, color: 0x000000 }
 export const READOUT_STYLE = { bgcolor: 0x000000, color: 0xffffff }
+/**
+ * A button that cannot be taken back: store over a preset slot, reboot.
+ *
+ * The same red as an alarm, on purpose — both say "stop and look" — but its own
+ * constant, because the two mean different things and may want to part ways.
+ * On a readout red is a measurement; here it is a warning about the press.
+ */
+export const DESTRUCTIVE_STYLE = { bgcolor: 0xcc0000, color: 0xffffff }
+/** Not "fine" and not "broken": we do not know. Grey, never red. */
+export const UNKNOWN_STYLE = { bgcolor: 0x555555, color: 0xcccccc }
+
+/**
+ * Should this reading be shown as unknown rather than judged?
+ *
+ * `state.contact` is one of:
+ *   'no-reading-yet'          nothing polled successfully yet
+ *   'ok'                      the last poll succeeded
+ *   'no-path-from-here'       our machine has no route (ENETUNREACH, ENOTFOUND, …)
+ *   'receiver-not-answering'  the receiver was asked and did not answer properly
+ *
+ * `source` is `'unit'` or a channel number as a string. For a channel, the lock
+ * state is in `state.channelLock[Number(source)]` (`'Locked'` / `'No Lock'`),
+ * and the readings in `state.channelPower` / `state.channelMer`.
+ *
+ * Returning `false` everywhere leaves today's behaviour untouched.
+ */
+function readingIsUnknown(state: ModuleInstance['state'], _source: string): boolean {
+	// Deliberately the simple version: any state other than a good last poll
+	// covers the button, so a reading we do not have never reads as one that is
+	// fine. Whether a locked-but-idle channel should also count as unknown is
+	// left open until it actually gets in the way — `_source` is already carried
+	// through for that day.
+	return state.contact !== 'ok'
+}
+
+/**
+ * Does the receiver currently hold `value` for `setting`?
+ *
+ * `state.settings[setting]` is whatever the last poll read back — the device's
+ * own spelling, e.g. 'LMST(S)', '10MHz', 'On', '001' — or `undefined` when the
+ * receiver did not report it. `value` is what someone typed into the button, or
+ * what a preset put there.
+ *
+ * Two cases are settled and not up for discussion below: nothing read back and
+ * nothing configured both mean "no match", because an empty reading matching an
+ * empty field would paint a button green on the strength of knowing nothing.
+ *
+ * TODO(human): decide how forgiving the comparison itself should be.
+ */
+function settingMatches(state: ModuleInstance['state'], setting: SettingId, value: string): boolean {
+	const reading = state.settings[setting]
+	if (reading === undefined || value === '') return false
+
+	return reading === value
+}
 
 export function UpdateFeedbacks(self: ModuleInstance): void {
 	self.setFeedbackDefinitions({
@@ -259,6 +324,51 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				const { direction, threshold } = feedback.options
 				return crossesThreshold(self.state.cameraBatteryVoltage, threshold, direction)
 			},
+		},
+
+		reading_unknown: {
+			name: 'Reading is unknown (grey)',
+			type: 'boolean',
+			description:
+				'Grey while this reading cannot be judged — no contact with the receiver yet, or no route to it from this machine. Stack it last on a monitoring button so it covers whatever the thresholds below it decided; a value we do not have is not a value that is fine, and it is not a fault either. The choice below is carried for a future that tells channels apart; today every setting behaves the same.',
+			defaultStyle: UNKNOWN_STYLE,
+			options: [
+				{
+					type: 'dropdown',
+					id: 'source',
+					label: 'Reading',
+					default: 'unit',
+					choices: [
+						{ id: 'unit', label: 'Unit-wide (temperatures, voltage, alarms)' },
+						...CHANNEL_IDS.map((n) => ({ id: String(n), label: `Channel ${n}` })),
+					],
+				},
+			],
+			callback: (feedback) => readingIsUnknown(self.state, feedback.options.source),
+		},
+
+		setting_is: {
+			name: 'Setting is at a given value',
+			type: 'boolean',
+			description:
+				'Green while the receiver already holds this value. Put it on the button that sets it, so the button shows what is selected instead of only what it would do.',
+			defaultStyle: OK_STYLE,
+			options: [
+				{
+					type: 'dropdown',
+					id: 'setting',
+					label: 'Setting',
+					default: 'mode',
+					choices: SETTING_SOURCES.map((source) => ({ id: source.id, label: source.label })),
+				},
+				{
+					type: 'textinput',
+					id: 'value',
+					label: 'Value, spelled as the receiver reports it — "10MHz", "LMST(S)", "On", and preset slots as "001"',
+					default: '',
+				},
+			],
+			callback: (feedback) => settingMatches(self.state, feedback.options.setting, feedback.options.value),
 		},
 	})
 }

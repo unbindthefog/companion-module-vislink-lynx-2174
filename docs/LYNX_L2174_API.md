@@ -114,7 +114,7 @@ Server: lighttpd/1.4.15
 </parameter>
 ```
 
-**DTD-Struktur**: `parameter → name, display*, units?, command?, min?, low?, mid?, up?, max?, option*`. Die optionalen `<low>`/`<mid>`/`<up>`-Elemente (Schwellwerte für die Touch-Slider-Darstellung) sind in der aktuellen Firmware bei keinem Parameter befüllt; `<command>` ebenfalls nicht — Schreibzugriffe laufen ausschließlich über `iframe.php` (siehe [Abschnitt 6](#6-schreibzugriff-aus-der-gui-abgeleitet--ungetestet)), nicht über einen in `settings.xml` hinterlegten Befehlsnamen.
+**DTD-Struktur**: `parameter → name, display*, units?, command?, min?, low?, mid?, up?, max?, option*`. Die optionalen `<low>`/`<mid>`/`<up>`-Elemente (Schwellwerte für die Touch-Slider-Darstellung) sind in der aktuellen Firmware bei keinem Parameter befüllt; `<command>` ebenfalls nicht — Schreibzugriffe laufen ausschließlich über `iframe.php` (siehe [Abschnitt 6](#6-schreibzugriff-am-laborger%C3%A4t-verifiziert)), nicht über einen in `settings.xml` hinterlegten Befehlsnamen.
 
 ---
 
@@ -169,18 +169,19 @@ Die 290 Parameter verteilen sich auf 8 sichtbare GUI-Tabs (Top-Nav `ROUTING…UN
 
 **Zweck**: RF-Empfangsparameter — Frequenz, Modulation, Bandbreite, FEC.
 
-| Parameter            | Label          | Wertebereich                      | Live-Wert (Beispiel) |
-| -------------------- | -------------- | --------------------------------- | -------------------- |
-| `DB_L2174_FREQ1`     | Frequency      | 0.0068–10.00 GHz                  | `2.325000`           |
-| `DB_L2174_RX_MODE`   | Mode           | `DVBT`, `LMST(S)`, `LMST(D)`      | `LMST(S)`            |
-| `DB_L2174_CHAN_BW`   | Bandwidth      | `3MHz`…`12MHz` (8 Stufen)         | `10MHz`              |
-| `DB_DEMOD_MOD_TYPE`  | Mode           | `QPSK`, `16QAM`, `64QAM`          | `16QAM`              |
-| `DB_DEMOD_FEC_RATE`  | FEC Rate       | `1/2`, `2/3`, `3/4`, `5/6`, `7/8` | `2/3`                |
-| `DB_DEMOD_GUARD_INT` | Guard Interval | `1/16`, `1/8`, `Auto`             | `Auto`               |
-| `DB_DEMOD_SPEC_POL`  | Polarity       | `Normal`, `Inverted`, `Auto`      | `Normal`             |
-| `DB_DEMOD_TRIAX_EN`  | Triax Mode     | `Off`, `Single`, `Dual`           | `Off`                |
-| `DB_DEMOD_FEC_LOCK`  | FEC Lock       | `No Lock`, `Locked`               | `Locked`             |
-| `DB_DEMOD_TPS_LOCK`  | TPS Lock       | `No Lock`, `Locked`               | `Locked`             |
+| Parameter            | Label           | Wertebereich                          | Live-Wert (Beispiel) |
+| -------------------- | --------------- | ------------------------------------- | -------------------- |
+| `DB_L2174_FREQ1`     | Frequency       | 0.0068–10.00 GHz                      | `2.325000`           |
+| `DB_L2174_RX_MODE`   | Mode            | `DVBT`, `LMST(S)`, `LMST(D)`          | `LMST(S)`            |
+| `DB_DEMOD_RX_MODE`   | Mode (Messwert) | `None`, `DVB-T`, `LMST(S)`, `LMST(D)` | `DVB-T`              |
+| `DB_L2174_CHAN_BW`   | Bandwidth       | `2MHz`…`12MHz` (9 Stufen) + `Auto`    | `10MHz`              |
+| `DB_DEMOD_MOD_TYPE`  | Mode            | `QPSK`, `16QAM`, `64QAM`              | `16QAM`              |
+| `DB_DEMOD_FEC_RATE`  | FEC Rate        | `1/2`, `2/3`, `3/4`, `5/6`, `7/8`     | `2/3`                |
+| `DB_DEMOD_GUARD_INT` | Guard Interval  | `1/32`, `1/16`, `1/8`, `1/4`, `Auto`  | `Auto`               |
+| `DB_DEMOD_SPEC_POL`  | Polarity        | `Normal`, `Inverted`, `Auto`          | `Normal`             |
+| `DB_DEMOD_TRIAX_EN`  | Triax Mode      | `Off`, `Single`, `Dual`               | `Off`                |
+| `DB_DEMOD_FEC_LOCK`  | FEC Lock        | `No Lock`, `Locked`                   | `Locked`             |
+| `DB_DEMOD_TPS_LOCK`  | TPS Lock        | `No Lock`, `Locked`                   | `Locked`             |
 
 **Verborgene Detailfelder (nicht in der GUI, aber in `data.xml`)** — pro Empfangskanal 1–4:
 
@@ -470,9 +471,40 @@ Diese beiden Felder entsprechen 1:1 den GUI-Seiten „DEMOD“ und „DECODER“
 
 ---
 
-## 6. Schreibzugriff (aus der GUI abgeleitet — **ungetestet**)
+## 6. Schreibzugriff (am Laborgerät verifiziert)
 
-> Alles in diesem Abschnitt wurde ausschließlich aus dem JavaScript der Web-GUI (`common/webgui.js`, `common/custom.js`) rekonstruiert. **Es wurde kein einziger Schreibzugriff gegen das Testgerät ausgeführt** — das Gerät ist im Produktiveinsatz. Vor einer echten Nutzung: an einem Ersatzgerät verifizieren.
+> Dieser Abschnitt war zunächst nur aus dem JavaScript der Web-GUI
+> (`common/webgui.js`, `common/custom.js`) rekonstruiert. **Am 20.10.2026 am
+> Laborgerät verifiziert** — Vislink Lynx L2174, Web-ID „Rx Relais",
+> Seriennummer 0324605, Build V1039 / SW 3.04, `10.81.5.149`, nur Strom und
+> Direktverbindung, nichts weiter angeschlossen.
+>
+> Das Protokoll funktioniert wie beschrieben: `GET` auf `iframe.php` mit
+> `param` und `value` antwortet mit `200`, der Wert ändert sich, **ohne
+> Authentifizierung und ohne Session-Cookie** — ein nacktes `curl` genügt.
+>
+> **Einschwingzeit gemessen** (Schreibzugriff bis zur Sichtbarkeit in
+> `data.xml`, Abtastung alle 250 ms):
+>
+> | Parameter           | gemessen      |
+> | ------------------- | ------------- |
+> | `DB_L2174_CHAN_BW`  | 335 … 2982 ms |
+> | `DB_L2174_FREQ1`    | 617 … 874 ms  |
+> | `DB_L2174_WEB_TEXT` | ~850 ms       |
+>
+> Die Spanne spiegelt, wie tief der Parameter ins Gerät greift: Die Web-ID ist
+> ein Anzeigestring, die Bandbreite zwingt den Demodulator zur
+> Neukonfiguration. Wer nach einem Schreibzugriff gegenliest, muss mit bis zu
+> drei Sekunden rechnen — das Modul pollt deshalb zweistufig nach.
+>
+> **Nachtrag 22.10.2026**: Diese Zeiten sind der kurze Fall, gemessen innerhalb
+> eines Modus. Ein Moduswechsel braucht rund 20 s — siehe „Einschwingzeiten,
+> zweite Messung" am Ende dieses Dokuments.
+>
+> **Gegen produktive Geräte gilt weiterhin Zurückhaltung**: `iframe.php`
+> antwortet auch dann mit `200`, wenn es den Wert verwirft, und die
+> geräteseitige Prüfung `check_for_invalid_setting_attempt` ist hier inert
+> (siehe unten).
 
 Jedes Set-Formular in der GUI ruft eine von mehreren JS-Funktionen auf, die alle auf dasselbe Muster hinauslaufen: ein `GET` auf `iframe.php`, dessen Antwort in einem unsichtbaren Frame (`setting_frame`) landet und die Seite dadurch nicht neu lädt.
 
@@ -603,3 +635,172 @@ Bemerkenswert: **L2174 ist die einzige der drei Plattformen mit eingebauter Selb
 **Gerät**: Vislink Lynx L2174 (IP: 10.81.5.131, Web-ID „K7“)
 **Firmware**: Unit Build V1039, Unit Sw Version 3.04, Kernel 1.05
 **Status**: Read-only untersucht & dokumentiert — **kein Schreibzugriff getestet** (Produktivgerät)
+
+---
+
+## 12. Nachtrag: schreibbare Parameter, am Laborgerät ausgezählt
+
+Frühere Abschnitte nennen 38/39 schreibbare Parameter. Diese Zahl stammt aus
+einem Blick auf einen Teil der GUI-Seiten und ist zu klein.
+
+Maßgeblich ist, welche Felder die GUI über `send_form(this, …)` bzw.
+`send_form_combo(this, …)` setzen — jedes solche Formular schreibt per
+`iframe.php`. Über alle 41 Seiten des Geräts ausgezählt (Laborgerät
+`10.81.5.149`, V1039, 20.10.2026):
+
+```bash
+# read-only: Seiten holen, Set-Formulare auszählen
+grep -ohE "send_form(_combo)?\(this, *'[^']*', *'DB_[A-Z0-9_]+'" *.html \
+  | grep -oE "DB_[A-Z0-9_]+" | sort -u | wc -l
+# -> 88
+```
+
+**88 schreibbare Parameter.** Nicht darunter, obwohl sie in `settings.xml` mit
+Optionsliste stehen: `DB_DEMOD_MOD_TYPE` und `DB_DEMOD_FEC_RATE` — der Receiver
+leitet beide aus dem TPS ab, sie sind Messwerte.
+
+### `settings.xml` taugt nicht als Schreibbarkeits-Quelle
+
+Dort haben auch reine Messwerte Optionslisten (`DB_DEMOD_COARSE_LOCK_1` →
+`No Lock`/`Locked`) und min/max (`DB_DEMOD_MER_1` → −10…40). Nach diesem
+Kriterium sähen 243 Parameter setzbar aus.
+
+### `enabled="yes|no"` ist dynamisch
+
+Das Attribut sagt, was **im aktuellen Zustand** wählbar ist, nicht was das Gerät
+kann. Beobachtet am selben Gerät innerhalb einer Stunde: im Modus LMST(S) waren
+bei `DB_L2174_CHAN_BW` nur `6MHz`/`7MHz`/`8MHz` freigegeben, während der
+Receiver selbst auf `10MHz` stand. Ein Client, der daraus seine Auswahlliste
+baut, muss sie also nach jeder Moduswahl neu holen — oder, wie dieses Modul, die
+vollen Wertemengen führen und sich auf das Zurücklesen verlassen.
+
+### Zwei Vokabulare für denselben Modus
+
+`DB_L2174_RX_MODE` (die Einstellung, schreibbar) kennt `DVBT`;
+`DB_DEMOD_RX_MODE` (der Messwert) schreibt denselben Modus als `DVB-T`. Wer
+einen gesetzten Wert gegenliest, muss denselben Parameter lesen, den er
+geschrieben hat.
+
+### Downconverter-Speisung ist schreibbar, ohne eigene GUI-Seite
+
+`DB_L2174_LNB_PWR_1..4` steht in Abschnitt 4 unter den verborgenen Parametern —
+es gibt keine Seite, auf der die Weboberfläche sie zeigt. Schreibbar ist sie
+trotzdem: am Laborgerät (20.10.2026, nichts am Koax) mit
+`iframe.php?param=DB_L2174_LNB_PWR_1&value=On` gesetzt und in `data.xml`
+zurückgelesen, anschließend wieder auf `Off`.
+
+Beobachtet dabei:
+
+- `DB_L2174_ALARMS` Bit 10 (`LNB Fault`) blieb in beiden Richtungen `0`. Ohne
+  angeschlossenen Downconverter meldet das Gerät also **keinen** Fehler — die
+  fehlende Last allein löst den Alarm nicht aus.
+- `DB_DEMOD_CURRENT_1` blieb unverändert bei `017`. Der Wert taugt damit nicht
+  als Nachweis, dass die Speisung an ist; dafür ist `DB_L2174_LNB_PWR_n` selbst
+  die einzige Quelle.
+
+### Rückleseformat von `DB_L2174_PRESET_NUM`
+
+Am Laborgerät meldete `data.xml` den ausgewählten Slot **dreistellig genullt**:
+`001`. Geschrieben wird er im selben Format (`iframe.php?param=…&value=001`),
+und in dieser Schreibweise hat das Gerät ihn angenommen.
+
+Beobachtet wurde allerdings nur Slot 1. Ob das Gerät bei zweistelligen Slots
+`010` oder `10` meldet, ist offen — deshalb vergleicht
+`selectPresetSlot()` in `src/actions.ts` **numerisch** und nicht zeichenweise.
+Die Begründung ist die Tragweite: seit dieser Vergleich darüber entscheidet, ob
+Preset-Recall und -Store überhaupt auslösen, würde eine abweichende Schreibweise
+beide Actions dauerhaft stummschalten, mit einer einzigen Warnzeile als Hinweis.
+
+### Einschwingzeiten, zweite Messung (22.10.2026)
+
+Die Werte in Abschnitt 6 (335–2982 ms) sind der **kurze** Fall. Nachgemessen am
+selben Laborgerät, jeweils bis der Wert in `data.xml` steht:
+
+| Schreibvorgang                                                                         | Dauer     |
+| -------------------------------------------------------------------------------------- | --------- |
+| gewöhnlicher Parameter (`DB_DECOD_FREEZE_ON_LOSS`, `DB_L2174_CHAN_BW` im selben Modus) | ~1,5 s    |
+| `DB_L2174_RX_MODE`                                                                     | **~20 s** |
+| `DB_L2174_CHAN_BW` direkt nach einem Moduswechsel                                      | **~17 s** |
+| `DB_L2174_PRESET_NUM` (nur Auswahl)                                                    | ~1 s      |
+
+Der Receiver akquiriert offenbar neu, bevor er den neuen Wert veröffentlicht.
+Wer nach einem Schreibvorgang gegenliest, muss deshalb mit **mehr als 20 s**
+rechnen, nicht mit drei. Das Modul wartet entsprechend
+(`VERIFY_WINDOW_MS` in `src/main.ts`).
+
+### Was das Gerät annimmt und was nicht
+
+| Fall                                                                  | Ergebnis                          |
+| --------------------------------------------------------------------- | --------------------------------- |
+| Wert außerhalb der aktuell `enabled`-Liste (`10MHz` in LMST(S))       | **angenommen**, nach 17 s         |
+| Wert mit `enabled="no"` in `settings.xml` (`Composite` auf Ausgang 1) | **angenommen**, sofort            |
+| Wert, den der Parameter gar nicht kennt (`Banane` für Freeze-on-Loss) | **verworfen**, Wert bleibt stehen |
+
+`enabled="yes|no"` in `settings.xml` beschreibt also, was die Weboberfläche
+gerade anbietet — nicht, was das Gerät verweigert. Verweigert wird nur, was
+nicht zum Wertebereich gehört. Für ein schreibendes Tool heißt das: die
+Wertelisten dürfen die vollen Mengen sein, aber **„angenommen" ist nicht
+dasselbe wie „wirksam"** — ob `Composite` auf Ausgang 1 tatsächlich am Stecker
+ankommt, ist damit nicht beantwortet.
+
+### `data.xml` führt nicht immer dieselben Parameter
+
+Der Parametersatz ist **nicht fest**. Mindestens ein Paar tauscht je nach
+Einstellung die Plätze — nachgewiesen am Laborgerät, 22.10.2026:
+
+| `DB_STATUS_PIN_MODE` | `DB_STATUS_PIN_STATE` | `DB_STATUS_PIN_ALARM_LEVEL` |
+| -------------------- | --------------------- | --------------------------- |
+| `Manual`             | vorhanden             | **fehlt**                   |
+| `Alarm`              | **fehlt**             | vorhanden                   |
+
+Geschrieben werden beide in jedem Modus und der Wert bleibt erhalten — nur
+lesen lässt sich jeweils der, der gerade gilt. Ein früherer Eintrag in diesem
+Dokument behauptete, `DB_STATUS_PIN_STATE` werde überhaupt nicht veröffentlicht;
+das stimmte nur, weil zum Zeitpunkt der Messung der Modus auf `Alarm` stand.
+
+Für ein schreibendes Tool heißt das: **„Parameter fehlt" ist nicht
+„Wert verworfen".** Wer nach einem Schreibvorgang gegenliest, muss die beiden
+Fälle trennen, sonst meldet er einen Fehler, den es nicht gibt.
+
+### Schnelle Folge von Schreibvorgängen auf denselben Parameter
+
+`DB_L2174_VIDEO_INPUT_MODE` braucht allein 3 s und löst eine Neukonfiguration
+des Decoders aus. Vier verschiedene Werte in kurzer Folge geschrieben, kam das
+Gerät nicht nach: Nach dem letzten Schreibvorgang (`HD MPEG2 LD`) stand es
+34 s später auf `SD MPEG2 LD` — einem Wert aus einem früheren Schritt.
+**Der letzte Schreibvorgang gewinnt also nicht zuverlässig.**
+
+Einzeln geschrieben, mit Ruhe davor, landet derselbe Wert in 3,1 s und bleibt.
+
+Nachgemessen mit Pausen — es reicht nicht, langsamer zu schreiben:
+
+| Pause zwischen drei Werten | Zustand nach 12 s Ruhe          |
+| -------------------------- | ------------------------------- |
+| 5 s                        | der **erste** der drei Werte    |
+| 8 s                        | der **mittlere** der drei Werte |
+
+Der Receiver bleibt also nicht nur zurück, er landet auf einem **beliebigen**
+der zuletzt geschriebenen Werte. Für ein schreibendes Tool heißt das: diesen
+Parameter nicht mehrfach kurz hintereinander setzen, und sich nicht darauf
+verlassen, dass der letzte Schreibvorgang gewinnt. Das Zurücklesen meldet den
+Fehlstand korrekt — es ist die einzige Instanz, die ihn bemerkt.
+
+### Was ein Reboot tut, gemessen
+
+`DB_L2174_REBOOT=Yes` am Laborgerät ausgelöst (22.10.2026), Ablauf aus Sicht
+eines pollenden Clients:
+
+| nach     | Beobachtung                                                     |
+| -------- | --------------------------------------------------------------- |
+| 1,4 s    | `ECONNREFUSED` — der Webserver ist weg                          |
+| ~8 s     | Anfrage läuft in den Timeout                                    |
+| ~12 s    | Webserver antwortet wieder, aber **`HTTP 404` auf `/data.xml`** |
+| **20 s** | `/data.xml` ist da, Konfiguration unverändert                   |
+
+Zwei Dinge für ein pollendes Tool: Das Gerät ist nach **20 Sekunden** wieder
+ansprechbar, nicht nach einer Minute — und es gibt ein Fenster, in dem der
+Webserver schon läuft, `data.xml` aber noch fehlt. Wer `404` nicht als
+Fehlschlag behandelt, liest in diesem Fenster einen leeren Parametersatz.
+
+Wie lange es dauert, bis der Decoder wieder ein Signal verarbeitet, ist damit
+**nicht** beantwortet — am Laborgerät lag keines an.

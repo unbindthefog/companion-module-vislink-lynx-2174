@@ -19,7 +19,8 @@ against that same receiver (all 39 variables populate correctly; see the
       power/MER/temperature/voltage threshold — each with a below/above
       direction rather than the comparison baked into the name
 - [x] Load the module into a real Companion instance and verify against the receiver
-- [x] Presets: 21 ready-made buttons in three sections (Signal / Decoder / Unit)
+- [x] Presets: 146 ready-made buttons in seven sections (Signal, Decoder,
+      Control — RF / Routing / Video / Unit, Unit)
 
 ### Verified against real hardware (2026-09-04)
 
@@ -93,18 +94,79 @@ reconstructed from the web UI's JavaScript only (`common/webgui.js`,
 GET /common/iframe.php?param=<NAME>&value=<VALUE>
 ```
 
-- [ ] Verify the pattern above against a lab unit, starting with a harmless,
-      easily-reversible parameter (e.g. `DB_L2174_WEB_TEXT`)
-- [ ] Decide which of the 38 GUI-writable parameters are safe and useful as
-      Companion actions
-- [ ] Implement, with confirmation-style presets for anything disruptive
-      (`DB_L2174_REBOOT`, `DB_L2174_PRESET_STORE`/`_RECALL`,
-      `DB_RESTORE_DEFAULTS` — the web UI itself requires a JS confirmation
-      dialog for these)
+- [x] Verify the pattern above against a lab unit, starting with a harmless,
+      easily-reversible parameter (`DB_L2174_WEB_TEXT`) — done 2026-10-20 on
+      "Rx Relais" (`10.81.5.149`), see `docs/LYNX_L2174_API.md` §6
+- [x] Decide which of the 88 GUI-writable parameters are safe and useful as
+      Companion actions — a two-tier allowlist in `src/api.ts`: 27 parameters
+      are always writable, 8 more only with the connection's "interrupting
+      actions" switch (preset recall/store, reboot, and the four downconverter
+      supplies, which put DC on an antenna input), and everything else is
+      refused whatever the switch says
+- [x] Implement — 28 actions, and one Control button per value for the 23 that
+      are a choice rather than a number, all built from one table
+      (`src/controls.ts`). Preset recall, preset store and
+      reboot are absent from the action list until the switch is on, rather
+      than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
+      material stay refused outright
+- [x] Verify on the lab unit (`10.81.5.149`, 2026-10-20): the first six
+      actions, preset recall end to end (30 parameters changed, the receiver
+      put the recall trigger back to `No` by itself, the IP address untouched),
+      and `DB_DECOD_FREEZE_ON_LOSS` from the new batch
+- [x] Downconverter power verified on the lab unit (2026-10-20, nothing on the
+      coax): `DB_L2174_LNB_PWR_1` set to `On` from a button and read back, then
+      back to `Off`. No LNB Fault alarm either way, and the channel's current
+      reading did not move — expected with no load. So the parameter is
+      writable despite having no GUI page of its own
+- [x] Preset chain re-verified after the delta review (2026-10-22): slot 1
+      recalled through the confirming path, and the receiver reports the slot
+      zero-padded to three digits whatever is written
+- [x] Every value of every choice action written to the lab unit and read back
+      (2026-10-22): all accepted, lists verified against the device, nothing
+      left changed. What the sweep cannot show is whether an accepted value
+      takes effect — that still needs signal, a downconverter, a monitor or a
+      reference, per `docs/HARDWARE_TESTS.md`
+- [x] Store preset and reboot triggered on the lab unit (2026-10-22), which
+      brings the actions pressed as a Companion button to 11 of 28 — the other
+      17 are covered on the parameter level by the sweep above, not through
+      their action. Store was tested without losing anything by
+      recalling slot 16 first and writing the same contents back; reboot
+      answers again after 20 s, not the minute the action used to claim, and
+      keeps its configuration
 
-Candidate actions, pending the above: frequency/bandwidth/modulation change,
-preset recall, ASI/IP routing change. Whether any of these are safe to expose
-without additional guardrails is unknown until tested on a lab unit.
+Deliberately left out: AES/BISS/EBS key material, licence entry,
+`DB_RESTORE_DEFAULTS` and the descrambling type (all refused in `api.ts`);
+IP and network configuration (a wrong gateway and the unit is gone);
+downconverter type and LO frequency (tied to the hardware actually fitted, and
+a wrong value kills reception silently); the CCU and L1500 return path (not
+testable without a camera and a modem). `DB_L2174_SET_ALL` is a momentary
+trigger that copies channel 1 to all four — not in yet, undecided.
+
+Read only (2026-10-22): a per-connection switch that empties the action list,
+drops the control presets and refuses the write in `src/api.ts` as well — the
+last of those at the moment the request leaves the queue, not when the action is
+called, which also retires the finding carried since `db46ba7`.
+
+Still open on the control side:
+
+- [ ] Decide how forgiving `settingMatches()` should be (`src/feedbacks.ts`
+      carries the `TODO(human)`)
+- [ ] No test setup in this repo at all. A hardware-free test over
+      `buildVariableValues`, `settingMatches` and the preset ids would cover
+      the fiddly parts (`'001'` against `1`, state cleared on contact loss)
+- [x] `set_rx_mode` wrote `DB_L2174_RX_MODE` while `rx_mode` read
+      `DB_DEMOD_RX_MODE` — fixed 2026-10-20 after the bench unit showed the two
+      use different words for the same mode (`DVBT` against `DVB-T`). `rx_mode`
+      is now the setting; `rx_mode_detected` is the demodulator's readout
+- [ ] Dropdown values are the full sets, hardcoded from `settings.xml`. The
+      device also publishes which of them are selectable _right now_
+      (`enabled="yes|no"`, and it changes with the receive mode), so the lists
+      could be built per connection instead. Bigger change: `settings.xml` would
+      have to be fetched and the action definitions rebuilt on connect.
+      Measured 2026-10-22, and it lowers the value of doing so: that flag says
+      what the web interface offers, not what the receiver refuses. It accepted
+      a bandwidth the flag had disabled — 17 s later — and only a value the
+      parameter does not know at all (`Banane`) is dropped
 
 ## Publishing
 
