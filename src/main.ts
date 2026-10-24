@@ -244,6 +244,14 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// `writeAndConfirm` runs its own confirmation and would otherwise poll
 		// for a value this method had quietly queued instead of sending.
 		if (verify && (this.#inFlight.has(name) || this.#pendingWrites.has(name))) {
+			// Only the most recent press is kept, so say what happened to the one
+			// it replaces. At `debug` this was invisible in practice — Companion
+			// does not show that level by default — and someone pressing three
+			// times would look for an explanation that was never written.
+			const replaced = this.#queuedWrites.get(name)
+			if (replaced && replaced.value !== value) {
+				this.log('info', `Dropping ${name} = ${replaced.value}: ${value} was pressed before it had its turn`)
+			}
 			this.#queuedWrites.set(name, { value, verify, queuedAt: Date.now() })
 			this.log('debug', `${name} is still settling; ${value} will follow`)
 			return
@@ -311,8 +319,14 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 * still on its way would accuse the receiver of rejecting a write it
 	 * accepted — and the warning cannot be taken back once logged. So when a
 	 * poll is running, give it one more round before saying anything.
+	 *
+	 * One round, not a second full window: the retry only has to outlast the
+	 * poll that is already in flight. Waiting the whole window again would
+	 * keep the slot claimed for twice the window, and a press queued behind it
+	 * would go out to the receiver long after whoever pressed it gave up.
 	 */
 	#armVerifyTimer(name: string, value: string, mayRetry: boolean): void {
+		const wait = mayRetry ? this.#verifyWindowMs() : this.#retryWindowMs()
 		const timer = setTimeout(() => {
 			if (mayRetry && this.#isPolling) {
 				// Replaces the entry rather than removing it, so the slot stays
@@ -325,7 +339,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 			// rather than left in the queue — where a later press would find it
 			// and overwrite itself with it.
 			this.#forgetPendingWrite(name)
-		}, this.#verifyWindowMs())
+		}, wait)
 		timer.unref?.()
 		this.#pendingWrites.set(name, { value, timer })
 	}
@@ -340,6 +354,15 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 */
 	#verifyWindowMs(): number {
 		return Math.max(VERIFY_WINDOW_MS, this.#pollIntervalMs * 2 + 5000)
+	}
+
+	/**
+	 * How long the retry waits: the poll that was in flight, plus the time a
+	 * slow answer takes to arrive. Never longer than the window it follows, so
+	 * the retry can only ever shorten the total hold, never extend it.
+	 */
+	#retryWindowMs(): number {
+		return Math.min(this.#verifyWindowMs(), this.#pollIntervalMs + 5000)
 	}
 
 	/**
@@ -408,7 +431,12 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#queuedWrites.delete(name)
 
 		const waited = Date.now() - queued.queuedAt
-		if (waited > Math.max(QUEUED_MAX_AGE_MS, this.#verifyWindowMs())) {
+		// The longest a press can legitimately be held is one verify window plus
+		// the retry that follows it. A limit shorter than that would discard
+		// presses the module itself held back — punishing the queue for doing
+		// its job, and only on the slow poll intervals where the wait is
+		// longest.
+		if (waited > Math.max(QUEUED_MAX_AGE_MS, this.#verifyWindowMs() + this.#retryWindowMs())) {
 			this.log('info', `Not setting ${name} = ${queued.value}: it waited ${Math.round(waited / 1000)} s for its turn`)
 			return
 		}

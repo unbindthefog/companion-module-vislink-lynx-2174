@@ -154,11 +154,20 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      75 assertions in under a second, no device and no Companion. It pins what
+      85 assertions in under a second, no device and no Companion. It pins what
       each action writes — every row of the table, every value, all four
       channels — against a hand-written list of parameter names rather than
       against the table itself, so a typo there fails rather than agreeing with
       itself. Also the two switches, the preset chains, and the backoff curve
+- [x] The write guards tested against real HTTP rather than a stub
+      (`test/api.test.js`, 2026-10-22): throwaway servers on 127.0.0.1, and the
+      tests ask which server was asked for what. This is the one seam the
+      stubbed tests cannot reach, and it is where the delta review found a
+      target check that compared a value against itself. Covered: the allowlist,
+      the guarded switch, read only, a write queued before read only was
+      switched on, a write queued before the address changed, and one queued
+      before the connection was closed. Each of the last three was confirmed by
+      putting the original fault back and watching the test fail
 - [x] `set_rx_mode` wrote `DB_L2174_RX_MODE` while `rx_mode` read
       `DB_DEMOD_RX_MODE` — fixed 2026-10-20 after the bench unit showed the two
       use different words for the same mode (`DVBT` against `DVB-T`). `rx_mode`

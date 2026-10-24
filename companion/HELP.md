@@ -276,6 +276,13 @@ With **interrupting actions** switched on, four more appear:
 | **Reboot receiver**         | Answers again after about 20 s with its configuration intact; decoding takes longer.                            |
 | **Set downconverter power** | Puts DC on an antenna input (1–4). Whatever is on the far end of that coax gets it — and see the warning below. |
 
+Both preset actions work in two steps — select the slot, then act on it — and
+only one of them runs at a time. Press a second preset button while the first
+is still selecting and it is refused with a line in the log, not queued: a
+press that arrived seconds ago may name a slot nobody is looking at any more,
+and for store that slot is overwritten for good. Press again once the first is
+through.
+
 Switching the setting back off removes them from the list again, but a button
 that already carries one keeps it and goes quiet: pressing it does nothing
 until the setting is on again. Nothing on the button says so — worth knowing
@@ -283,12 +290,20 @@ before wondering why it stopped working. The same is true under read only,
 except there the connection list says `Read only`, which is at least a place to
 look.
 
-One thing not to do: press two buttons for the **same** setting in quick
-succession. `Set video input mode` takes about three seconds and reconfigures
-the decoder, and it does not simply lag — write three values with five seconds
-between them and the receiver settles on the _first_ one; with eight seconds,
-on the middle one. The last press does not reliably win. Set it once and let it
-be; the read-back will tell you if it did not take.
+**Pressing twice for the same setting.** The receiver cannot take two values
+for one setting back to back: write three with five seconds between them and it
+settles on the _first_ one; with eight seconds, on the middle one. So the module
+does not pass the second press straight on. It holds it until the first one has
+been read back or given up on, and then sends it — the last press wins, but not
+at once. Two things follow. The button can stay on the old value for a while
+before it moves, which is the module waiting, not the receiver refusing. And
+only the most recent press is held: press three times and the middle one is
+dropped, which the log says.
+
+A press held for too long is dropped rather than sent — the log says that too.
+At the default poll interval that limit is about a minute. The point is that
+a setting nobody is still waiting for should not change the receiver out of
+nowhere, long after whoever pressed it moved on.
 
 **One per-channel setting is not per-channel.** The receiver has a flag,
 `DB_L2174_SET_ALL`, that makes a downconverter setting apply to every _enabled_

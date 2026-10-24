@@ -212,6 +212,15 @@ export class LynxApi {
 	#options: LynxApiOptions
 	#log: ApiLogger
 	#agent: http.Agent | null = null
+	/**
+	 * Set by `destroy()`, cleared only by `updateOptions()`.
+	 *
+	 * Destroying the agent is not enough to stop a request that is still in the
+	 * queue: Node falls back to its global agent when none is given, so the
+	 * request goes out anyway — measured, not assumed. A connection being taken
+	 * down is as good a reason to drop a write as being pointed elsewhere.
+	 */
+	#destroyed = false
 	#queue: Promise<unknown> = Promise.resolve()
 	#pending = 0
 
@@ -229,10 +238,23 @@ export class LynxApi {
 	updateOptions(options: LynxApiOptions): void {
 		this.#options = options
 		this.resetAgent()
+		// Reconfiguring is the one thing that does reopen a closed client.
+		this.#destroyed = false
 	}
 
+	/**
+	 * Throw away the socket pool and start a fresh one.
+	 *
+	 * Deliberately does not touch `#destroyed` in either direction: recycling
+	 * sockets is not the same as closing or reopening a client. The ECONNRESET
+	 * handler calls this from inside a failing request — going through
+	 * `destroy()` here would close the client on a recoverable error, and
+	 * clearing the flag would let a write queued behind that request go out
+	 * after the connection was taken down. Both measured against a stub server,
+	 * not reasoned about.
+	 */
 	resetAgent(): void {
-		this.destroy()
+		this.#dropAgent()
 		this.#agent = new http.Agent({
 			keepAlive: true,
 			keepAliveMsecs: 1000,
@@ -240,7 +262,14 @@ export class LynxApi {
 		})
 	}
 
+	/** Close this client for good: no further request may leave. */
 	destroy(): void {
+		this.#destroyed = true
+		this.#dropAgent()
+	}
+
+	/** Throw the socket pool away, without saying anything about the client. */
+	#dropAgent(): void {
 		this.#agent?.destroy()
 		this.#agent = null
 	}
@@ -264,13 +293,19 @@ export class LynxApi {
 		const refusal = this.#refuseWrite(key)
 		if (refusal) throw new Error(`Refusing to write ${name}: ${refusal}`)
 
+		// The receiver this write was aimed at, read *now* — not when the
+		// request leaves. Between the press and the send the connection can be
+		// pointed somewhere else: `updateOptions` keeps this instance and does
+		// not empty the queue, so a write waiting behind a slow poll would
+		// otherwise go out to whatever address is current by then. Reading the
+		// target at send time and comparing it against the same live options
+		// compares a value with itself and can never disagree.
+		const aimedAt = `${this.#options.host}:${this.#options.port}`
+
 		await this.#get(path, () => {
 			const late = this.#refuseWrite(key)
 			if (late) throw new Error(`Refusing to write ${name}: ${late}`)
-			// The receiver this write was meant for. Between the press and the
-			// request leaving, the connection can have been pointed somewhere
-			// else, and the value would land on a receiver nobody aimed at.
-			return `${this.#options.host}:${this.#options.port}`
+			return aimedAt
 		})
 	}
 
@@ -326,9 +361,16 @@ export class LynxApi {
 		const { host, port, timeoutMs } = this.#options
 
 		if (!host) throw new Error('No receiver address configured')
-		// Belt and braces: `beforeSend` has just read these, so a mismatch would
-		// mean they changed inside this tick, which they cannot. Cheap enough to
-		// keep as the thing that makes the guarantee local to the send.
+		// Checked here rather than only where the request is built: the queue is
+		// serial, so a request can be waiting at the moment the connection is
+		// taken down or has its address cleared, and neither of those goes
+		// through `updateOptions` — the target check below would compare the
+		// old options against themselves and agree.
+		if (this.#destroyed) throw new Error('Refusing to send: this connection has been closed')
+		// The target the caller aimed at, against the one in force now. These
+		// disagree when the connection was pointed at a different receiver
+		// while this request sat in the queue — the write is then dropped
+		// rather than delivered to a receiver nobody aimed at.
 		if (checkedTarget !== undefined && checkedTarget !== `${host}:${port}`) {
 			throw new Error('Refusing to write: the connection was pointed at a different receiver')
 		}

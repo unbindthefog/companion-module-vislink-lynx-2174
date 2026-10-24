@@ -256,11 +256,13 @@ export function UpdateActions(self: ModuleInstance): void {
 					callback: async (action) => {
 						// Two steps, the order the receiver's own interface uses: select
 						// the slot, then trigger the recall. The trigger acts on whatever
-						// slot is selected, so the first step has to be confirmed.
-						if (!(await selectPresetSlot(self, action.options.preset))) return
-						// 'Yes' is a momentary trigger: the receiver acts and drops the
-						// parameter back to 'No', so there is nothing to read back.
-						await write('DB_L2174_PRESET_RECALL', 'Yes', false)
+						// slot is selected, so the first step has to be confirmed — and
+						// the pair has to stay together, hence `withPresetSlot`.
+						await withPresetSlot(self, action.options.preset, async () => {
+							// 'Yes' is a momentary trigger: the receiver acts and drops the
+							// parameter back to 'No', so there is nothing to read back.
+							await write('DB_L2174_PRESET_RECALL', 'Yes', false)
+						})
 					},
 				}
 			: undefined,
@@ -272,8 +274,9 @@ export function UpdateActions(self: ModuleInstance): void {
 						'Overwrites the chosen slot with the receiver\u2019s current settings. The previous contents are gone.',
 					options: [presetNumber()],
 					callback: async (action) => {
-						if (!(await selectPresetSlot(self, action.options.preset))) return
-						await write('DB_L2174_PRESET_STORE', 'Yes', false)
+						await withPresetSlot(self, action.options.preset, async () => {
+							await write('DB_L2174_PRESET_STORE', 'Yes', false)
+						})
 					},
 				}
 			: undefined,
@@ -317,6 +320,47 @@ function presetNumber() {
 		max: 16,
 		step: 1,
 		clampValues: true,
+	}
+}
+
+/**
+ * One preset action at a time, per connection.
+ *
+ * `DB_L2174_PRESET_NUM` is a single device-wide selection, and both preset
+ * actions read it, act on it, and leave it where they found it. Two actions
+ * overlapping would let the second one move the selection out from under the
+ * first — and "store" then overwrites a slot nobody chose, for good. The
+ * module's ordinary write queue does not cover this: it serialises per
+ * parameter, while the thing that must not interleave here is the *pair*.
+ */
+const presetBusy = new WeakMap<ModuleInstance, boolean>()
+
+/**
+ * Select the slot, run the trigger, and keep other preset actions out meanwhile.
+ *
+ * A second press while one is running is refused, not queued. Queueing would
+ * mean a press landing on the receiver seconds after it was made, by which
+ * time the slot it names may no longer be the one anyone is looking at — and
+ * for store that is a slot overwritten for good. Refusing costs one press; the
+ * operator presses again when the first is through. Said out loud rather than
+ * dropped quietly: an action that does nothing and reports nothing is
+ * indistinguishable from one that failed.
+ */
+async function withPresetSlot(self: ModuleInstance, raw: unknown, trigger: () => Promise<void>): Promise<void> {
+	if (presetBusy.get(self)) {
+		self.log(
+			'warn',
+			`Ignoring preset ${JSON.stringify(raw)}: another preset action is still running — press again once it is through`,
+		)
+		return
+	}
+
+	presetBusy.set(self, true)
+	try {
+		if (!(await selectPresetSlot(self, raw))) return
+		await trigger()
+	} finally {
+		presetBusy.set(self, false)
 	}
 }
 

@@ -55,7 +55,7 @@ Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
 | `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
 | `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
 
-Seit dem 22.10. gibt es zusätzlich `yarn test`: 75 Prüfungen ohne Gerät, die
+Seit dem 22.10. gibt es zusätzlich `yarn test`: 85 Prüfungen ohne Gerät, die
 festhalten, **was jede Action schreibt** — jede Tabellenzeile, jeder Wert, alle
 vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
 die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür
@@ -214,7 +214,7 @@ erreichbar.
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `store_preset`                                            | Überschreibt den Slot endgültig. Am 22.10. verlustfrei geprüft, indem erst derselbe Slot geladen wurde; für jeden anderen Slot gilt der Rat weiter |
 | `reboot_receiver`                                         | Etwa 20 s nicht ansprechbar (gemessen); wie lange bis wieder dekodiert wird, ist ohne Signal offen                                                 |
-| `set_status_pin_mode` / `_state` / `_alarm_level`         | Der Status-Pin hängt unter Umständen in einer Haustechnik. Erst klären, was daran angeschlossen ist                                                |
+| `set_status_pin_mode` / `_state` / `_alarm_level`         | Am Laborgerät geklärt (24.10., Jan): am Status-Pin hängt **nichts**, die drei sind dort gefahrlos. An einem Gerät im Einsatz kann der Pin in einer Haustechnik stecken — dort weiter erst fragen |
 | Routing (`set_asi_output_source`, `set_ip_output_source`) | Nimmt einem nachgelagerten Gerät das Signal weg                                                                                                    |
 
 Beim Status-Pin meldet das Gerät immer nur **einen** der beiden Pegel zurück,

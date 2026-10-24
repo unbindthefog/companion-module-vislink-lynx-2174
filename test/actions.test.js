@@ -229,6 +229,57 @@ describe('the actions that are not a choice between fixed values', () => {
 	})
 })
 
+describe('two preset actions cannot interleave', () => {
+	it('refuses the second press while the first is still selecting a slot', async () => {
+		const self = stubInstance({ allowGuardedActions: true })
+		// Hold the slot selection open, the way an 8 s confirmation would.
+		let release
+		self.writeAndConfirm = async (name, value) => {
+			self.writes.push({ name, value, confirmed: true })
+			await new Promise((resolve) => (release = resolve))
+			return true
+		}
+		UpdateActions(self)
+
+		const first = self.definitions.store_preset.callback({ options: { preset: 3 } })
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		await self.definitions.store_preset.callback({ options: { preset: 7 } })
+
+		// The second press must not have moved the selection. If it had, the
+		// first action would store the receiver's settings into slot 7.
+		assert.deepEqual(
+			self.writes.map((w) => w.value),
+			['003'],
+			'a second preset action must not touch the slot while the first holds it',
+		)
+		assert.ok(
+			self.logs.find((l) => l.level === 'warn' && l.message.includes('another preset action is still running')),
+			'a refused press has to say so',
+		)
+
+		release()
+		await first
+		assert.deepEqual(
+			self.writes.map((w) => w.name),
+			['DB_L2174_PRESET_NUM', 'DB_L2174_PRESET_STORE'],
+			'the first action still completes',
+		)
+	})
+
+	it('lets the next press through once the lock is released', async () => {
+		const self = stubInstance({ allowGuardedActions: true })
+		UpdateActions(self)
+		await self.definitions.recall_preset.callback({ options: { preset: 2 } })
+		await self.definitions.recall_preset.callback({ options: { preset: 5 } })
+
+		assert.deepEqual(
+			self.writes.map((w) => w.value),
+			['002', 'Yes', '005', 'Yes'],
+			'the lock is a lock, not a latch',
+		)
+	})
+})
+
 describe('the downconverter supply says how far it reaches', () => {
 	it('names every enabled channel while the receiver applies settings to all', async () => {
 		const self = stubInstance(
