@@ -250,10 +250,13 @@ export function UpdatePresets(self: ModuleInstance): void {
 			// contact behind it.
 			//
 			// Deliberately *after* the red one, so grey wins: a reference
-			// error on a switched-off genlock is nothing to alarm about. That
-			// rests on an untested assumption — `Fail` has never been seen on
-			// hardware — so if the receiver ever reports it while `Off`, this
-			// order is the thing to revisit.
+			// error on a switched-off genlock is nothing to alarm about. The
+			// red branch itself is confirmed — on 2026-10-26 the bench unit
+			// went to `Fail` the moment genlock was set to `SD` with nothing
+			// on the reference input. What stays unproven is the converse:
+			// that it never reports `Fail` while `Off`. It read `OK`
+			// throughout that day, which supports the order without settling
+			// it, so this is still the line to revisit if one ever shows up.
 			{
 				feedbackId: 'setting_is',
 				options: { setting: 'genlock', value: 'Off' },

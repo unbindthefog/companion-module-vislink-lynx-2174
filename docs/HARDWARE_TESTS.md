@@ -61,12 +61,62 @@ vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
 die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür
 sind die Abschnitte unten da.
 
-Damit sind **11 der 29 Actions** über eine Companion-Taste ausgelöst worden:
-die neun aus der Tabelle darüber plus Store und Reboot. Die übrigen 18 sind im
-Sweep weiter unten **auf Parameterebene** geprüft — jeder Wert geschrieben und
-zurückgelesen —, aber nicht über ihre Action. Das ist der verbleibende
-Unterschied: Der Schreibpfad des Moduls ist für alle derselbe tabellengetriebene
-Code, nachgewiesen ist er an elfen.
+Am 26.10.2026 kamen die restlichen **18** dazu, alle über eine echte
+Companion-Taste: dafür wurde in Companion die temporäre Seite 4 („Labor-Test")
+angelegt, ausschließlich auf der Verbindung `lynx-labor` → `10.81.5.149`, die
+Presets aus dem Modul daraufgezogen und über
+`POST /api/location/4/<row>/<col>/press` gedrückt. Vor und nach jedem Druck
+wurde `data.xml` gelesen und verglichen. `set_guard_interval` war schon am
+22.10. auf diesem Weg gedrückt worden und steht der Vollständigkeit halber mit
+in der Tabelle.
+
+| Action                      | geschrieben                     | am Gerät gelesen |
+| --------------------------- | ------------------------------- | ---------------- |
+| `set_guard_interval`        | `Auto` → `1/32`                 | ✓ (22.10.)       |
+| `set_spectral_polarity`     | `Auto` → `Inverted`             | ✓                |
+| `set_channel_enable`        | Kanal 1 `On` → `Off`            | ✓                |
+| `set_all_channels`          | `Yes` → `No`                    | ✓                |
+| `set_asi_output_source`     | `Demodulator` → `Diversity`     | ✓                |
+| `set_ip_output_source`      | `Off` → `Demodulator`           | ✓                |
+| `set_asi_diversity`         | `On` → `Off`                    | ✓                |
+| `set_diversity_delay`       | `Auto` → `Off`                  | ✓                |
+| `set_video_input_mode`      | `HD MPEG2 LD` → `H264`          | ✓                |
+| `set_genlock`               | `Off` → `SD`                    | ✓                |
+| `set_video_output_1`        | `SDI+Overlay` → `SDI`           | ✓                |
+| `set_video_output_2`        | `SDI` → `SDI+Overlay`           | ✓                |
+| `set_overlay_type`          | `Basic` → `Service`             | ✓                |
+| `set_overlay_background`    | `100` → `50`                    | ✓                |
+| `set_overlay_colour`        | `White` → `Green`               | ✓                |
+| `set_status_pin_mode`       | `Alarm` → `Manual`              | ✓                |
+| `set_status_pin_state`      | `High` → `Low`                  | ✓                |
+| `set_status_pin_alarm_level`| `High` → `Low` → `High`         | ✓, aber langsam  |
+
+Damit sind **alle 29 Actions** über eine Companion-Taste ausgelöst worden. Das
+Gerät stand danach wieder im Ausgangszustand — nach einer Wiederholung von vier
+Writes, siehe den dritten Punkt unten; geprüft durch Vergleich von `data.xml`
+vorher und nachher.
+
+Drei Beobachtungen aus dem Durchgang:
+
+- **`DB_STATUS_PIN_ALARM_LEVEL` braucht länger als 4 s**, bis der neue Wert in
+  `data.xml` steht — mehr sagt die Messung nicht. Nach 4 s meldete der
+  Vergleich „keine Änderung", beim nächsten Blick nach ~14 s stand der Wert da;
+  wann genau dazwischen er ankam, wurde nicht eingegrenzt. Ohne den zweiten
+  Blick wäre das als verworfener Write durchgegangen.
+- **`data.xml` wechselt seine Parameter auch mit dem Video-Eingangsmodus**, nicht
+  nur mit dem Status-Pin: mit `H264` verschwinden `DB_DECOD_PSF_MODE` und
+  `DB_DECOD_GOP`, dafür erscheinen `DB_DECOD_BIT_DEPTH`,
+  `DB_DECOD_PICTURE_WIDTH` und `_HEIGHT`.
+- **Das Gerät verwirft auch Writes auf _verschiedene_ Parameter**, wenn sie zu
+  dicht aufeinander folgen. Beim Zurückstellen gingen vier von vierzehn Writes
+  mit 1,5 s Abstand verloren; mit 6 s Abstand nahm es sie beim ersten Versuch
+  an. Die bekannte „zwei Werte hintereinander"-Grenze ist damit, soweit
+  gemessen, keine Eigenheit eines Parameters, sondern gilt geräteweit. Gemessen
+  sind allerdings nur die beiden Abstände 1,5 s und 6 s an einem Gerät — wo
+  dazwischen die Grenze liegt, ist offen. **Offener Befund:** Die
+  Schreibwarteschlange des Moduls serialisiert pro Parameter, nicht geräteweit —
+  ein Tastendruck auf zwei verschiedene Einstellungen kurz hintereinander kann
+  also denselben Verlust erzeugen.
 
 ## Sweep vom 22.10.2026: jeder Wert einmal geschrieben
 
@@ -169,13 +219,14 @@ Monitor an Ausgang 1 und 2, am besten mit Bild.
 
 | Action        | Werte           | Worauf achten                                                                                                                                                                                                                                             |
 | ------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set_genlock` | `Off` `SD` `HD` | Geht `DB_DECOD_GEN_LOCK_ERROR` von `OK` auf `Fail`, wenn keine oder die falsche Referenz anliegt? **Das Feedback `genlock_failed` ist seit 22.10. ausgeliefert, sein roter Zweig aber nie am Gerät gesehen** — ohne Referenz gibt es nichts zu verlieren. |
+| `set_genlock` | `Off` `SD` `HD` | **Für einen Fall beantwortet am 26.10.**: mit Genlock auf `SD` und **nichts** am Referenzeingang springt `DB_DECOD_GEN_LOCK_ERROR` von `OK` auf `Fail`, und das Preset „Frame lock (genlock)" wird in Companion **rot** — der rote Zweig von `genlock_failed` ist damit erstmals an echter Hardware gesehen. Nicht gemessen: `HD` ohne Referenz, und eine _falsche_ Referenz (SD-Signal bei `HD`); für Letzteres fehlt eine Quelle. |
 
 Frame Lock ist genau die Art Fehler, die man im Bild erst bemerkt, wenn es zu
-spät ist — deshalb gibt es das Feedback schon, bevor es am Gerät gesehen
-wurde. Reagiert `genlock_error` zuverlässig, ist der rote Zweig bestätigt;
-reagiert es nicht, muss das Feedback weg, statt eine Sicherheit zu behaupten,
-die es nicht hat.
+spät ist. Das Feedback gab es, bevor es am Gerät gesehen wurde; seit dem 26.10.
+ist es für `SD` ohne Referenz bestätigt. Die Stapelreihenfolge im Preset (grau gewinnt über rot, wenn
+Genlock `Off` ist) ruht weiter auf der ungeprüften Annahme, dass das Gerät bei
+`Off` nie `Fail` meldet — bei `Off` stand `GEN_LOCK_ERROR` an diesem Tag
+durchgehend auf `OK`, was die Annahme stützt, ohne sie zu beweisen.
 
 ## 5. Offen seit dem 22.10.: angenommen heißt nicht wirksam
 
@@ -228,7 +279,7 @@ Kein Vorgriff, nur die Stellen, an denen ein Testergebnis etwas am Modul ändern
 würde:
 
 - Strom unter Last brauchbar → Feedback und Ampel für die Speisung
-- `genlock_error` reagiert zuverlässig → das ausgelieferte Feedback ist belegt; tut es das nicht, muss es wieder raus
+- `genlock_error` reagiert auch bei `HD` und bei _falscher_ Referenz → das Feedback ist über den einen gemessenen Fall hinaus belegt (für `SD` ohne Referenz ist es das seit 26.10.)
 - Gerät lehnt Werte sichtbar ab → die Wertelisten könnten doch aus `settings.xml`
   je Verbindung geholt werden, statt die vollen Mengen zu führen (steht als
   offener Punkt in `ROADMAP.md`)

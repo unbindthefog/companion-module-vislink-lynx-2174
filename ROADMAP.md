@@ -126,11 +126,20 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       left changed. What the sweep cannot show is whether an accepted value
       takes effect — that still needs signal, a downconverter, a monitor or a
       reference, per `docs/HARDWARE_TESTS.md`
-- [x] Store preset and reboot triggered on the lab unit (2026-10-22), which
-      brings the actions pressed as a Companion button to 11 of 29 — the other
-      18 are covered on the parameter level by the sweep above, not through
-      their action. Store was tested without losing anything by
-      recalling slot 16 first and writing the same contents back; reboot
+- [x] All 29 actions pressed as a Companion button on the lab unit
+      (2026-10-26). A temporary page 4 in Companion, on the lab connection
+      only, with the module's own presets dragged onto it and pressed through
+      the HTTP API; `data.xml` compared before and after each press, and the
+      unit put back to its starting state afterwards. Three things fell out of
+      it: `genlock_failed`'s red branch was seen for the first time (with
+      genlock on `SD` and nothing on the reference input — `HD` was not
+      tried), the status pin's alarm level needs more than 4 s to read back,
+      and the receiver dropped writes to *different* parameters sent 1.5 s
+      apart, while 6 s apart went through. Where between those the limit sits
+      was not measured — see `docs/HARDWARE_TESTS.md`
+- [x] Store preset and reboot triggered on the lab unit (2026-10-22). Store
+      was tested without losing anything by recalling slot 16 first and
+      writing the same contents back; reboot
       answers again after 20 s, not the minute the action used to claim, and
       keeps its configuration
 
