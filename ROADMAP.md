@@ -107,7 +107,7 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       24 rows that are a choice rather than a number, all built from one table
       (`src/controls.ts`). The twenty-fourth, `Apply channel settings to all`,
       has an action but no ready-made button on purpose: it is a mode that
-      changes what *other* buttons reach, and none of those buttons could show
+      changes what _other_ buttons reach, and none of those buttons could show
       it. Preset recall, preset store and
       reboot are absent from the action list until the switch is on, rather
       than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
@@ -137,9 +137,10 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       it: `genlock_failed`'s red branch was seen for the first time (with
       genlock on `SD` and nothing on the reference input — `HD` was not
       tried), the status pin's alarm level needs more than 4 s to read back,
-      and the receiver dropped writes to *different* parameters sent 1.5 s
-      apart, while 6 s apart went through. Where between those the limit sits
-      was not measured — see `docs/HARDWARE_TESTS.md`
+      and a long run of writes lost some of them. The explanation first drawn
+      from that — a device-wide 1.5 s limit — was measured again on 2026-10-26
+      and is **wrong**: short runs survive 0.2 s. See
+      `docs/HARDWARE_TESTS.md` §8
 - [x] Store preset and reboot triggered on the lab unit (2026-10-22). Store
       was tested without losing anything by recalling slot 16 first and
       writing the same contents back; reboot
@@ -166,11 +167,22 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      90 assertions in under a second, no device and no Companion. It pins what
+      95 assertions in about half a minute, no device and no Companion — the
+      write-path tests wait on real timers for outages and the spacing between
+      held writes, which is where that time goes. It pins what
       each action writes — every row of the table, every value, all four
       channels — against a hand-written list of parameter names rather than
       against the table itself, so a typo there fails rather than agreeing with
       itself. Also the two switches, the preset chains, and the backoff curve
+- [x] The write path itself tested through the real module
+      (`test/writepath.test.js`, 2026-10-26): Companion's own base class with a
+      stand-in for the host, pointed at a throwaway receiver on 127.0.0.1 whose
+      answers the test controls. This was the module's riskiest uncovered code
+      — one write in flight per parameter, the value held behind it, and the
+      catch-up after an outage. The stub answers `200` to a write without
+      applying it, exactly as the real receiver does, so "the receiver has not
+      taken it yet" is something a test can act out. The spacing test was
+      confirmed by putting the all-in-one-tick flush back and watching it fail
 - [x] The write guards tested against real HTTP rather than a stub
       (`test/api.test.js`, 2026-10-22): throwaway servers on 127.0.0.1, and the
       tests ask which server was asked for what. This is the one seam the

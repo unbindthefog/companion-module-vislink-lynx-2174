@@ -95,6 +95,25 @@ const CONFIRM_TIMEOUT_MS = 8000
  */
 const QUEUED_MAX_AGE_MS = 60_000
 
+/**
+ * How far apart to let waiting values out after contact returns.
+ *
+ * Measured on the bench, and not what was first assumed. Short runs of writes
+ * are fine: three parameters at 0.2 s apart, and five straight after a codec
+ * change at 1.5 s, all arrived. What the receiver does not survive is a long
+ * sustained run — fourteen writes at 1.5 s lost three of them, repeatably,
+ * while every run at 6 s lost none. The mechanism is not pinned down; 6 s is
+ * the shortest spacing that has never lost a write, not a known threshold.
+ *
+ * This only applies to the catch-up after an outage, which is the one place
+ * the module produces a run of that length. A press answered straight away is
+ * a run of one and goes out at once. One other place can produce a short run:
+ * when several parameters confirm in the same poll and each has a value
+ * waiting, those go out back to back — short runs survived 0.2 s on the
+ * bench, so they are left alone.
+ */
+export const RELEASE_GAP_MS = 6000
+
 export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	config!: ModuleConfig
 
@@ -150,6 +169,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 * passed through on the way.
 	 */
 	#queuedWrites = new Map<string, { value: string; verify: boolean; queuedAt: number }>()
+	/** Runs while the catch-up after an outage is still letting values out. */
+	#releaseTimer: NodeJS.Timeout | null = null
 	/**
 	 * Parameters whose write request is out but not yet answered.
 	 *
@@ -306,9 +327,12 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// rather than one guessed delay: the first two keep an ordinary button
 		// feeling immediate, the third is there for the slow pair, so they do not
 		// have to wait for the next scheduled poll to turn green.
-		setTimeout(() => void this.#poll(), 1200)
-		setTimeout(() => void this.#poll(), 3500)
-		setTimeout(() => void this.#poll(), 21000)
+		// Unreferenced like every other timer here: these outlive the write by
+		// up to 21 s, and a module being taken down should not be kept alive by
+		// a catch-up poll that will find no client anyway.
+		for (const delay of [1200, 3500, 21000]) {
+			setTimeout(() => void this.#poll(), delay).unref?.()
+		}
 	}
 
 	/**
@@ -437,8 +461,89 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#flushQueued(name)
 	}
 
-	/** Send the value that was waiting for this parameter, if there is one. */
-	#flushQueued(name: string): void {
+	/**
+	 * Let the values that waited out an outage go, one at a time.
+	 *
+	 * Called from a successful poll, which is the moment we know contact is
+	 * back. Releasing them all in the same tick is what the receiver cannot
+	 * take: they go through one serial connection milliseconds apart, and a
+	 * sustained run like that is the one case where it drops writes.
+	 *
+	 * The first goes immediately — a single waiting value is not a run, and
+	 * that is the common case. The rest follow at `RELEASE_GAP_MS`, and each
+	 * carries how long this chain has held it, so the staleness check can
+	 * allow for a wait the module imposed on it.
+	 */
+	#releaseQueuedWrites(): void {
+		// One release at a time. A poll every two seconds would otherwise start
+		// a second run on top of the first and undo the spacing.
+		if (this.#releaseTimer) return
+
+		const ready = [...this.#queuedWrites.keys()].filter(
+			(name) => !this.#pendingWrites.has(name) && !this.#inFlight.has(name),
+		)
+		if (ready.length === 0) return
+
+		const asOf = Date.now()
+		if (ready.length > 1) {
+			this.log(
+				'info',
+				`Contact is back: letting ${ready.length} held values out ${RELEASE_GAP_MS / 1000} s apart, which this receiver needs`,
+			)
+		}
+		this.#releaseNext(ready, asOf)
+	}
+
+	/** One value from the catch-up, then a timer for the next. */
+	#releaseNext(remaining: string[], asOf: number): void {
+		// Contact can go again mid-chain, and a failed poll deliberately does
+		// *not* empty the queue — one dropped answer is ordinary. So the chain
+		// has to stop by itself: every further step would delete a value from
+		// the queue, fail to send it, and leave nothing to put it back. The
+		// next successful poll starts a fresh release with whatever is still
+		// waiting.
+		if (this.state.contact !== 'ok') {
+			this.#releaseTimer = null
+			return
+		}
+
+		const name = remaining.shift()
+		// Re-checked rather than trusted: between two steps of a release a press
+		// can have landed, or this value can have been sent by the ordinary path.
+		if (name !== undefined && !this.#pendingWrites.has(name) && !this.#inFlight.has(name)) {
+			this.#flushQueued(name, Date.now() - asOf)
+		}
+
+		if (remaining.length === 0) {
+			this.#releaseTimer = null
+			return
+		}
+		this.#releaseTimer = setTimeout(() => this.#releaseNext(remaining, asOf), RELEASE_GAP_MS)
+		this.#releaseTimer.unref?.()
+	}
+
+	/** Stop a catch-up that is still running. */
+	#stopRelease(): void {
+		if (!this.#releaseTimer) return
+		clearTimeout(this.#releaseTimer)
+		this.#releaseTimer = null
+	}
+
+	/**
+	 * Send the value that was waiting for this parameter, if there is one.
+	 *
+	 * `spacing` is the time this module itself spent holding the release back.
+	 * It is added to the limit rather than subtracted from the age, so the log
+	 * still says how long the value really waited — back-dating the age gave
+	 * the same verdict but a misleading number.
+	 *
+	 * Capped, because otherwise the limit stops being one: a chain of fourteen
+	 * values spends 78 s on spacing alone, and the last of them would be
+	 * allowed to arrive well over two minutes after anyone pressed anything.
+	 * One extra limit's worth of grace is the most a self-imposed wait can
+	 * buy; past that the press is as stale as any other.
+	 */
+	#flushQueued(name: string, spacing = 0): void {
 		const queued = this.#queuedWrites.get(name)
 		if (!queued) return
 		this.#queuedWrites.delete(name)
@@ -449,7 +554,8 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		// presses the module itself held back — punishing the queue for doing
 		// its job, and only on the slow poll intervals where the wait is
 		// longest.
-		if (waited > Math.max(QUEUED_MAX_AGE_MS, this.#verifyWindowMs() + this.#retryWindowMs())) {
+		const limit = Math.max(QUEUED_MAX_AGE_MS, this.#verifyWindowMs() + this.#retryWindowMs())
+		if (waited > limit + Math.min(spacing, limit)) {
 			this.log('info', `Not setting ${name} = ${queued.value}: it waited ${Math.round(waited / 1000)} s for its turn`)
 			return
 		}
@@ -470,6 +576,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#pendingWrites.clear()
 
 		if (!dropQueued) return
+		// A catch-up in progress is aimed at the receiver this connection has
+		// just stopped talking to, so it stops with the queue it was draining.
+		this.#stopRelease()
 		// Only when the connection has been pointed somewhere else, or taken
 		// down: these values were meant for a receiver this connection is no
 		// longer talking to. A single failed poll is not that — the backoff
@@ -599,6 +708,16 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 			this.#updateState(values)
 			this.setVariableValues(values)
+			// Contact is recorded before the feedbacks are checked, because
+			// `readingIsUnknown` reads it and greys every monitoring button.
+			// Checking first meant the fresh readings were already on screen
+			// while the buttons still wore the grey of the failed poll before
+			// them — a full poll interval of "unknown" over values that are
+			// not unknown. The failure path has always set it first; this is
+			// the success path catching up, so grey arrives at once and green
+			// no later.
+			this.#consecutiveFailures = 0
+			this.state.contact = 'ok'
 			this.checkFeedbacks(...ALL_FEEDBACKS)
 
 			for (const [name, pending] of this.#pendingWrites) {
@@ -618,13 +737,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 			// Anything still waiting with nothing pending in front of it — a write
 			// that failed while the receiver was away, or a queue that outlived a
-			// dropped answer. This is the point at which we know contact is back.
-			for (const name of [...this.#queuedWrites.keys()]) {
-				if (!this.#pendingWrites.has(name) && !this.#inFlight.has(name)) this.#flushQueued(name)
-			}
-
-			this.#consecutiveFailures = 0
-			this.state.contact = 'ok'
+			// dropped answer. Contact is already recorded as back above, which
+			// `#releaseNext` requires: released first, the catch-up died on the
+			// failed poll's value and announced itself for nothing.
+			this.#releaseQueuedWrites()
 			this.#setError('')
 			// Named in the status rather than left to be discovered: a control
 			// button under read-only looks exactly as it did and simply does

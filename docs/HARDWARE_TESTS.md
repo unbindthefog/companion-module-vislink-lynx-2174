@@ -55,7 +55,7 @@ Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
 | `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
 | `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
 
-Seit dem 22.10. gibt es zusätzlich `yarn test`: 90 Prüfungen ohne Gerät, die
+Seit dem 22.10. gibt es zusätzlich `yarn test`: 95 Prüfungen ohne Gerät, die
 festhalten, **was jede Action schreibt** — jede Tabellenzeile, jeder Wert, alle
 vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
 die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür
@@ -70,26 +70,26 @@ wurde `data.xml` gelesen und verglichen. `set_guard_interval` war schon am
 22.10. auf diesem Weg gedrückt worden und steht der Vollständigkeit halber mit
 in der Tabelle.
 
-| Action                      | geschrieben                     | am Gerät gelesen |
-| --------------------------- | ------------------------------- | ---------------- |
-| `set_guard_interval`        | `Auto` → `1/32`                 | ✓ (22.10.)       |
-| `set_spectral_polarity`     | `Auto` → `Inverted`             | ✓                |
-| `set_channel_enable`        | Kanal 1 `On` → `Off`            | ✓                |
-| `set_all_channels`          | `Yes` → `No`                    | ✓                |
-| `set_asi_output_source`     | `Demodulator` → `Diversity`     | ✓                |
-| `set_ip_output_source`      | `Off` → `Demodulator`           | ✓                |
-| `set_asi_diversity`         | `On` → `Off`                    | ✓                |
-| `set_diversity_delay`       | `Auto` → `Off`                  | ✓                |
-| `set_video_input_mode`      | `HD MPEG2 LD` → `H264`          | ✓                |
-| `set_genlock`               | `Off` → `SD`                    | ✓                |
-| `set_video_output_1`        | `SDI+Overlay` → `SDI`           | ✓                |
-| `set_video_output_2`        | `SDI` → `SDI+Overlay`           | ✓                |
-| `set_overlay_type`          | `Basic` → `Service`             | ✓                |
-| `set_overlay_background`    | `100` → `50`                    | ✓                |
-| `set_overlay_colour`        | `White` → `Green`               | ✓                |
-| `set_status_pin_mode`       | `Alarm` → `Manual`              | ✓                |
-| `set_status_pin_state`      | `High` → `Low`                  | ✓                |
-| `set_status_pin_alarm_level`| `High` → `Low` → `High`         | ✓, aber langsam  |
+| Action                       | geschrieben                 | am Gerät gelesen |
+| ---------------------------- | --------------------------- | ---------------- |
+| `set_guard_interval`         | `Auto` → `1/32`             | ✓ (22.10.)       |
+| `set_spectral_polarity`      | `Auto` → `Inverted`         | ✓                |
+| `set_channel_enable`         | Kanal 1 `On` → `Off`        | ✓                |
+| `set_all_channels`           | `Yes` → `No`                | ✓                |
+| `set_asi_output_source`      | `Demodulator` → `Diversity` | ✓                |
+| `set_ip_output_source`       | `Off` → `Demodulator`       | ✓                |
+| `set_asi_diversity`          | `On` → `Off`                | ✓                |
+| `set_diversity_delay`        | `Auto` → `Off`              | ✓                |
+| `set_video_input_mode`       | `HD MPEG2 LD` → `H264`      | ✓                |
+| `set_genlock`                | `Off` → `SD`                | ✓                |
+| `set_video_output_1`         | `SDI+Overlay` → `SDI`       | ✓                |
+| `set_video_output_2`         | `SDI` → `SDI+Overlay`       | ✓                |
+| `set_overlay_type`           | `Basic` → `Service`         | ✓                |
+| `set_overlay_background`     | `100` → `50`                | ✓                |
+| `set_overlay_colour`         | `White` → `Green`           | ✓                |
+| `set_status_pin_mode`        | `Alarm` → `Manual`          | ✓                |
+| `set_status_pin_state`       | `High` → `Low`              | ✓                |
+| `set_status_pin_alarm_level` | `High` → `Low` → `High`     | ✓, aber langsam  |
 
 Damit sind **alle 29 Actions** über eine Companion-Taste ausgelöst worden. Das
 Gerät stand danach wieder im Ausgangszustand — nach einer Wiederholung von vier
@@ -107,16 +107,10 @@ Drei Beobachtungen aus dem Durchgang:
   nur mit dem Status-Pin: mit `H264` verschwinden `DB_DECOD_PSF_MODE` und
   `DB_DECOD_GOP`, dafür erscheinen `DB_DECOD_BIT_DEPTH`,
   `DB_DECOD_PICTURE_WIDTH` und `_HEIGHT`.
-- **Das Gerät verwirft auch Writes auf _verschiedene_ Parameter**, wenn sie zu
-  dicht aufeinander folgen. Beim Zurückstellen gingen vier von vierzehn Writes
-  mit 1,5 s Abstand verloren; mit 6 s Abstand nahm es sie beim ersten Versuch
-  an. Die bekannte „zwei Werte hintereinander"-Grenze ist damit, soweit
-  gemessen, keine Eigenheit eines Parameters, sondern gilt geräteweit. Gemessen
-  sind allerdings nur die beiden Abstände 1,5 s und 6 s an einem Gerät — wo
-  dazwischen die Grenze liegt, ist offen. **Offener Befund:** Die
-  Schreibwarteschlange des Moduls serialisiert pro Parameter, nicht geräteweit —
-  ein Tastendruck auf zwei verschiedene Einstellungen kurz hintereinander kann
-  also denselben Verlust erzeugen.
+- **Das Gerät verwirft Writes in einer langen, anhaltenden Serie.** Beim
+  Zurückstellen gingen drei von vierzehn Writes mit 1,5 s Abstand verloren, im
+  Rücklauf einer; mit 6 s Abstand nahm es sie beim ersten Versuch an. Siehe
+  Abschnitt 8 — die daraus zunächst gezogene Erklärung war falsch.
 
 ## Sweep vom 22.10.2026: jeder Wert einmal geschrieben
 
@@ -217,8 +211,8 @@ Monitor an Ausgang 1 und 2, am besten mit Bild.
 
 ## 4. Was eine Referenz braucht
 
-| Action        | Werte           | Worauf achten                                                                                                                                                                                                                                             |
-| ------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Action        | Werte           | Worauf achten                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `set_genlock` | `Off` `SD` `HD` | **Für einen Fall beantwortet am 26.10.**: mit Genlock auf `SD` und **nichts** am Referenzeingang springt `DB_DECOD_GEN_LOCK_ERROR` von `OK` auf `Fail`, und das Preset „Frame lock (genlock)" wird in Companion **rot** — der rote Zweig von `genlock_failed` ist damit erstmals an echter Hardware gesehen. Nicht gemessen: `HD` ohne Referenz, und eine _falsche_ Referenz (SD-Signal bei `HD`); für Letzteres fehlt eine Quelle. |
 
 Frame Lock ist genau die Art Fehler, die man im Bild erst bemerkt, wenn es zu
@@ -261,17 +255,54 @@ erreichbar.
 
 ## 7. Nicht auf Sendung, und mit Ansage
 
-| Action                                                    | Warum                                                                                                                                              |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `store_preset`                                            | Überschreibt den Slot endgültig. Am 22.10. verlustfrei geprüft, indem erst derselbe Slot geladen wurde; für jeden anderen Slot gilt der Rat weiter |
-| `reboot_receiver`                                         | Etwa 20 s nicht ansprechbar (gemessen); wie lange bis wieder dekodiert wird, ist ohne Signal offen                                                 |
+| Action                                                    | Warum                                                                                                                                                                                            |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `store_preset`                                            | Überschreibt den Slot endgültig. Am 22.10. verlustfrei geprüft, indem erst derselbe Slot geladen wurde; für jeden anderen Slot gilt der Rat weiter                                               |
+| `reboot_receiver`                                         | Etwa 20 s nicht ansprechbar (gemessen); wie lange bis wieder dekodiert wird, ist ohne Signal offen                                                                                               |
 | `set_status_pin_mode` / `_state` / `_alarm_level`         | Am Laborgerät geklärt (24.10., Jan): am Status-Pin hängt **nichts**, die drei sind dort gefahrlos. An einem Gerät im Einsatz kann der Pin in einer Haustechnik stecken — dort weiter erst fragen |
-| Routing (`set_asi_output_source`, `set_ip_output_source`) | Nimmt einem nachgelagerten Gerät das Signal weg                                                                                                    |
+| Routing (`set_asi_output_source`, `set_ip_output_source`) | Nimmt einem nachgelagerten Gerät das Signal weg                                                                                                                                                  |
 
 Beim Status-Pin meldet das Gerät immer nur **einen** der beiden Pegel zurück,
 je nach Modus (siehe Sweep oben). Dass ein Wert ankommt, ist damit im passenden
 Modus belegt — ob am Pin tatsächlich die Spannung anliegt, sagt auch das nicht.
 Dafür bleibt ein Multimeter der einzige Nachweis.
+
+## 8. Wie dicht Writes aufeinander folgen dürfen (26.10.2026)
+
+Am 25.10. stand hier, das Gerät verwerfe Writes auf verschiedene Parameter, die
+dichter als ~1,5 s aufeinander folgen. **Das war falsch**, und zwar auf die
+lehrreiche Art: aus einem einzigen Durchlauf (drei Writes mit 1,5 s verloren,
+dieselben mit 6 s angenommen; die damalige Notiz zählte vier, weil sie den
+Rücklauf mitnahm) war eine Schwelle geworden. Zwei Datenpunkte,
+eine Erklärung, keine Gegenprobe.
+
+Nachgemessen am Laborgerät:
+
+| Versuch                                       | Abstand                       | Ergebnis           |
+| --------------------------------------------- | ----------------------------- | ------------------ |
+| 3 Parameter, isoliert                         | 0,2 / 1,0 / 1,5 / 2 / 3 / 4 s | alle übernommen    |
+| 4 Parameter nach einem Ausgangswechsel        | 1,5 s                         | alle übernommen    |
+| 5 Parameter nach einem Codec-Wechsel          | 1,5 s                         | alle übernommen    |
+| **14 Parameter am Stück**                     | **1,5 s**                     | **3 verloren**     |
+| dieselben 14 zurück                           | 1,5 s                         | 1 verloren (Codec) |
+| 3 Overlay-Parameter, jede Ausgangskombination | 6 s                           | alle übernommen    |
+
+Kurze Folgen übersteht das Gerät also auch bei 0,2 s. Was es nicht übersteht,
+ist eine **lange, anhaltende Serie** — vierzehn Writes über einundzwanzig
+Sekunden. Der Mechanismus ist nicht geklärt; 6 s ist der kürzeste Abstand, bei
+dem noch nie etwas verloren ging, **keine bekannte Schwelle**.
+
+Drei gezielte Versuche, es mit kurzen Folgen zu provozieren, schlugen fehl —
+erst die vollständige Nachstellung reproduzierte es. Wer das hier nachmisst,
+sollte also nicht nach drei negativen Versuchen aufhören.
+
+**Was daraus folgt:** Eine geräteweite Mindestwartezeit zwischen allen Writes
+wäre die falsche Antwort — sie bremste jeden normalen Tastendruck für ein
+Problem, das beim normalen Tastendrücken nicht auftritt. Das Modul erzeugt eine
+solche Serie an genau einer Stelle selbst: beim Nachholen der zurückgehaltenen
+Werte, nachdem der Kontakt zurückkehrt. Nur dort wird seit dem 26.10. entzerrt
+(`RELEASE_GAP_MS`, 6 s), und dort kostet die Verzögerung nichts, weil die Werte
+ohnehin zu spät sind.
 
 ## Was aus den Ergebnissen folgen kann
 
