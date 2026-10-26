@@ -248,32 +248,32 @@ edit once the button is on the page.
 
 ## Actions
 
-| Action                            | Effect                                                                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Set receive frequency**         | Retunes the demodulator. The link drops until the transmitter matches.                                                          |
-| **Set channel bandwidth**         | `2MHz`–`12MHz`, or `Auto`. Takes up to three seconds to apply — the slowest write on the unit.                                  |
-| **Set receive mode**              | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                         |
-| **Set decoder source**            | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                      |
-| **Set demodulator diversity**     | On or off.                                                                                                                      |
-| **Set guard interval**            | `1/32`, `1/16`, `1/8`, `1/4` or `Auto`. Fixing it shortens acquisition.                                                         |
-| **Set spectral polarity**         | `Normal`, `Inverted` or `Auto`.                                                                                                 |
-| **Apply channel settings to all** | While `Yes`, a downconverter setting on one channel is applied to every _enabled_ channel. See the warning below.               |
-| **Set channel enable**            | Takes one diversity input (1–4) in or out of the combination.                                                                   |
-| **Set ASI output source**         | What feeds the ASI output.                                                                                                      |
-| **Set IP output source**          | What feeds the IP output, or `Off`.                                                                                             |
-| **Set ASI diversity input**       | Whether the external ASI input joins the diversity combination.                                                                 |
-| **Set diversity delay**           | `Auto` lines up inputs arriving over different path lengths.                                                                    |
-| **Set video input mode**          | Which codec the decoder expects. The wrong one gives no picture, not a bad one.                                                 |
-| **Set frame lock (genlock)**      | `Off`, `SD` or `HD`. `genlock_error` says whether it took.                                                                      |
-| **Set on signal loss**            | What the output shows when the link drops: the last frame, or blue.                                                             |
+| Action                            | Effect                                                                                                                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Set receive frequency**         | Retunes the demodulator. The link drops until the transmitter matches.                                                                                                                                                      |
+| **Set channel bandwidth**         | `2MHz`–`12MHz`, or `Auto`. Takes up to three seconds to apply — the slowest write on the unit.                                                                                                                              |
+| **Set receive mode**              | `DVBT`, `LMST(S)` or `LMST(D)`. Re-acquires the signal.                                                                                                                                                                     |
+| **Set decoder source**            | Which input feeds the decoder: demodulator, external ASI, diversity or IP.                                                                                                                                                  |
+| **Set demodulator diversity**     | On or off.                                                                                                                                                                                                                  |
+| **Set guard interval**            | `1/32`, `1/16`, `1/8`, `1/4` or `Auto`. Fixing it shortens acquisition.                                                                                                                                                     |
+| **Set spectral polarity**         | `Normal`, `Inverted` or `Auto`.                                                                                                                                                                                             |
+| **Apply channel settings to all** | While `Yes`, a downconverter setting on one channel is applied to every _enabled_ channel. See the warning below.                                                                                                           |
+| **Set channel enable**            | Takes one diversity input (1–4) in or out of the combination.                                                                                                                                                               |
+| **Set ASI output source**         | What feeds the ASI output.                                                                                                                                                                                                  |
+| **Set IP output source**          | What feeds the IP output, or `Off`.                                                                                                                                                                                         |
+| **Set ASI diversity input**       | Whether the external ASI input joins the diversity combination.                                                                                                                                                             |
+| **Set diversity delay**           | `Auto` lines up inputs arriving over different path lengths.                                                                                                                                                                |
+| **Set video input mode**          | Which codec the decoder expects. The wrong one gives no picture, not a bad one.                                                                                                                                             |
+| **Set frame lock (genlock)**      | `Off`, `SD` or `HD`. `genlock_error` says whether it took.                                                                                                                                                                  |
+| **Set on signal loss**            | What the output shows when the link drops: the last frame, or blue.                                                                                                                                                         |
 | **Set video output 1 / 2**        | `SDI`, `SDI+Overlay`, `Composite` or `Comp+Overlay` — the same four on both. The bench unit accepted and reported all four on output 1, but whether a picture comes out of the socket was not tested; that needs a monitor. |
-| **Set overlay type**              | `Basic` or `Service`. Only visible on an output set to `+Overlay`.                                                              |
-| **Set overlay background**        | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                               |
-| **Set overlay colour**            | `White` or `Green`.                                                                                                             |
-| **Set status pin mode**           | Whether the status pin follows the alarm state or is driven by hand.                                                            |
-| **Set status pin state**          | Drives the pin directly. Only has an effect — and is only reported back — in `Manual` mode.                                     |
-| **Set status pin level …**        | Which level the pin takes when an alarm is active.                                                                              |
-| **Set web ID**                    | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered. |
+| **Set overlay type**              | `Basic` or `Service`. Only visible on an output set to `+Overlay`.                                                                                                                                                          |
+| **Set overlay background**        | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                                                                                                                           |
+| **Set overlay colour**            | `White` or `Green`.                                                                                                                                                                                                         |
+| **Set status pin mode**           | Whether the status pin follows the alarm state or is driven by hand.                                                                                                                                                        |
+| **Set status pin state**          | Drives the pin directly. Only has an effect — and is only reported back — in `Manual` mode.                                                                                                                                 |
+| **Set status pin level …**        | Which level the pin takes when an alarm is active.                                                                                                                                                                          |
+| **Set web ID**                    | The name the receiver shows in its own interface. Harmless; an empty value is refused because the old name cannot be recovered.                                                                                             |
 
 With **interrupting actions** switched on, four more appear:
 
@@ -321,7 +321,7 @@ it; while it is `Yes`, `Set downconverter power` for channel 1 energises every
 enabled channel, not only the one the button names. Channel enable itself is unaffected.
 
 There is deliberately no ready-made button for it. It is a mode rather than a
-setting anyone operates: changing it alters what *other* buttons reach, and
+setting anyone operates: changing it alters what _other_ buttons reach, and
 nothing on those buttons would show it. The action is there for whoever needs
 it, and building a button is a deliberate enough act for something this quiet.
 The `set_all_channels` variable shows where it stands.
