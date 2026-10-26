@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { UpdateActions } from '../dist/actions.js'
+import { GetConfigFields } from '../dist/config.js'
 import { UpdatePresets } from '../dist/presets.js'
 import { GUARDED_PARAMETERS, SAFE_PARAMETERS } from '../dist/api.js'
 import {
@@ -233,6 +234,18 @@ describe('the actions that are not a choice between fixed values', () => {
 
 		assert.deepEqual(self.writes, [])
 		assert.match(self.logs.at(-1).message, /empty web ID/)
+	})
+})
+
+describe('the connection starts locked', () => {
+	it('ships with read only switched on', () => {
+		// A default nobody can change later without it being a behaviour change
+		// for existing users, so it is pinned here rather than left to a glance
+		// at the dialog. The cost is not symmetric: starting locked costs a
+		// tick, starting open costs a write nobody intended.
+		const field = GetConfigFields().find((f) => f.id === 'readOnly')
+		assert.ok(field, 'the switch has to exist')
+		assert.equal(field.default, true)
 	})
 })
 

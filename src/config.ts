@@ -61,14 +61,19 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			width: 12,
 			label: 'Read only',
 			value:
-				'Turns this connection into a monitor: variables and feedbacks keep working, and the receiver is never written to. There are no actions at all while it is on, so there is nothing to place on a button by mistake — and the refusal also sits in the client itself, so a button that already carries an action cannot reach the receiver either. The right setting for a receiver that is on air.',
+				'On by default, and a new connection starts as a monitor: variables and feedbacks keep working, and the receiver is never written to. There are no actions at all while it is on, so there is nothing to place on a button by mistake — and the refusal also sits in the client itself, so a button that already carries an action cannot reach the receiver either. Clear it deliberately, for a receiver you mean to control; leave it for one that is on air.',
 		},
 		{
 			type: 'checkbox',
 			id: 'readOnly',
 			label: 'Read only — never write to this receiver',
 			width: 12,
-			default: false,
+			// Default on. Whoever adds a connection is pointing it at a receiver
+			// before they have decided anything else about it, and the first poll
+			// may well land on one that is on air. The cost of the wrong default
+			// is not symmetric: starting locked costs a tick in a dialog, while
+			// starting open costs a write nobody intended.
+			default: true,
 			disableAutoExpression: true,
 		},
 		{
@@ -101,15 +106,23 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
  * exists. `api.ts` refuses the write as well, because a connection can be
  * switched to read-only while a button somewhere still carries an action.
  *
- * `config` is undefined before the first `configUpdated`, and absent means
- * writes are allowed — the default for the field, and what every connection
- * saved before this switch existed expects.
+ * `config` is undefined before the first `configUpdated`, and an absent
+ * `readOnly` means writes are allowed. That is *not* the field's default —
+ * the default is `true`, and Companion writes it into the stored config the
+ * first time a connection starts. Absent therefore means one thing only: a
+ * connection saved before this switch existed. Those were writing before and
+ * keep writing; changing the default must not reach back and silence them.
  */
 export function writesAllowed(self: { config?: ModuleConfig }): boolean {
 	// Any truthy value locks, not only an exact `true`. An imported or
 	// hand-edited `.companionconfig` can carry `1` or `"yes"`, which the dialog
-	// renders as a ticked box — a safety switch has to fail towards the lock,
-	// and `undefined` (never saved) still means writes are allowed.
+	// renders as a ticked box, and a safety switch has to fail towards the lock
+	// for anything it does not recognise.
+	//
+	// `undefined` is the one exception, and deliberate: it cannot come from a
+	// new connection — Companion saves the default on first start — only from
+	// one older than the switch. Tightening this to `=== false` would lock
+	// those silently, which is the opposite of what the default change is for.
 	return !self.config?.readOnly
 }
 

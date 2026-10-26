@@ -158,7 +158,16 @@ momentary trigger at all but a mode, and is now exposed — see the entry above.
 Read only (2026-10-22): a per-connection switch that empties the action list,
 drops the control presets and refuses the write in `src/api.ts` as well — the
 last of those at the moment the request leaves the queue, not when the action is
-called, which also retires the finding carried since `db46ba7`.
+called, which also retires the finding carried since `db46ba7`. **On by
+default since 2026-10-26**, before the first release rather than after: a
+default is free to choose until someone else's connections depend on it, and
+the wrong one here costs a write nobody intended, not a tick in a dialog.
+Existing connections are unaffected, and the reason is Companion's, not ours:
+it applies a field's default only on a connection's first init, writes it into
+the stored config there, and never fills a missing field in afterwards. So a
+connection older than the switch keeps writing, and `src/upgrades.ts` stays
+empty on purpose — a migration here would silence exactly the connections that
+are meant to be left alone.
 
 Still open on the control side:
 
@@ -167,7 +176,7 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      95 assertions in about half a minute, no device and no Companion — the
+      96 assertions in about half a minute, no device and no Companion — the
       write-path tests wait on real timers for outages and the spacing between
       held writes, which is where that time goes. It pins what
       each action writes — every row of the table, every value, all four
