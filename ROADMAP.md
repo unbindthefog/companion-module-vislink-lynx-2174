@@ -166,7 +166,7 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      88 assertions in under a second, no device and no Companion. It pins what
+      90 assertions in under a second, no device and no Companion. It pins what
       each action writes — every row of the table, every value, all four
       channels — against a hand-written list of parameter names rather than
       against the table itself, so a typo there fails rather than agreeing with

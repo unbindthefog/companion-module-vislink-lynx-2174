@@ -111,8 +111,8 @@ LNB fault, so there is no second reading to confirm it against.
 | `genlock`            | `Off` / `SD` / `HD`                               |
 | `genlock_error`      | `OK` / `Fail` — reports `OK` while genlock is off |
 | `freeze_on_loss`     | `Freeze` / `Blue`                                 |
-| `video_output_1`     | `SDI` / `SDI+Overlay`                             |
-| `video_output_2`     | same, plus the composite variants                 |
+| `video_output_1`     | `SDI`, `SDI+Overlay`, `Composite`, `Comp+Overlay` |
+| `video_output_2`     | the same four                                     |
 | `overlay_type`       | `Basic` / `Service`                               |
 | `overlay_background` | `Off`, or `10`–`100`                              |
 | `overlay_colour`     | `White` / `Green`                                 |
@@ -150,6 +150,14 @@ connection is healthy.
 
 ## Feedbacks
 
+- **Setting is** — true while the chosen setting reads the chosen value. This
+  is what turns a control button green when the receiver is on the value that
+  button names. Whitespace and case are ignored, and numbers are compared as
+  numbers, so `007` matches `7`.
+- **Reading is unknown** — true while the chosen area has no fresh reading,
+  because the receiver has not been reached or has not reported it yet. The
+  ready-made buttons stack this last, as a grey cover: a button that cannot
+  know says so rather than keeping the last colour it had.
 - **RF channel is locked** — true while the chosen channel (1–4) reports RF
   lock. Use directly for a green "locked" button, or inverted for a red alarm
   button.
@@ -204,7 +212,7 @@ Monitoring first, then one button per value for everything the actions can set:
 | Section               | Buttons                                                                      |
 | --------------------- | ---------------------------------------------------------------------------- |
 | **Signal**            | RF lock plus power and MER as traffic lights — one of each per channel (1–4) |
-| **Decoder**           | Video lock, detected video format, audio 1 + 2 lock                          |
+| **Decoder**           | Video lock, detected video format, frame lock, audio 1 + 2 lock              |
 | **Control — RF**      | Receive mode, bandwidth, guard interval, polarity, channel enable, frequency |
 | **Control — Routing** | Decoder source, ASI and IP output source, the three diversity inputs, delay  |
 | **Control — Video**   | Video input mode, genlock, on-signal-loss, both output formats, the overlay  |
@@ -258,7 +266,7 @@ edit once the button is on the page.
 | **Set video input mode**          | Which codec the decoder expects. The wrong one gives no picture, not a bad one.                                                 |
 | **Set frame lock (genlock)**      | `Off`, `SD` or `HD`. `genlock_error` says whether it took.                                                                      |
 | **Set on signal loss**            | What the output shows when the link drops: the last frame, or blue.                                                             |
-| **Set video output 1 / 2**        | `SDI` or `SDI+Overlay`; output 2 also does composite on units fitted for it.                                                    |
+| **Set video output 1 / 2**        | `SDI`, `SDI+Overlay`, `Composite` or `Comp+Overlay` — the same four on both. The bench unit accepted and reported all four on output 1, but whether a picture comes out of the socket was not tested; that needs a monitor. |
 | **Set overlay type**              | `Basic` or `Service`. Only visible on an output set to `+Overlay`.                                                              |
 | **Set overlay background**        | How solid the strip behind the text is: `Off`, or 10–100 percent.                                                               |
 | **Set overlay colour**            | `White` or `Green`.                                                                                                             |

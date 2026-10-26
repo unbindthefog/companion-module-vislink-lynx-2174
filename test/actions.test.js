@@ -36,6 +36,12 @@ function stubInstance(config = {}, settings = {}) {
 		// What the last poll read back. Actions consult it to say what a press
 		// will actually reach, so it is part of their input, not decoration.
 		state: { settings },
+		// Which parameters were written but not read back yet. Default: none,
+		// so a test says so explicitly when it wants the in-between state.
+		unconfirmed: new Set(),
+		isUnconfirmed(parameter) {
+			return this.unconfirmed.has(parameter)
+		},
 		config: { host: '10.0.0.1', port: 80, pollInterval: 2, readOnly: false, allowGuardedActions: false, ...config },
 		writes,
 		logs,
@@ -364,6 +370,36 @@ describe('the downconverter supply says how far it reaches', () => {
 		assert.ok(warned, 'an unread flag still has to be said out loud')
 		assert.match(warned.message, /not read back yet/)
 		assert.match(warned.message, /channel 1, 2, 3, 4/)
+	})
+
+	it('warns while the flag itself is still waiting to be read back', async () => {
+		// The dangerous order: set apply-to-all to Yes, then press downconverter
+		// power before the next poll has confirmed it. `state.settings` still
+		// says `No`, and believing it would drop the warning at the one moment
+		// it is most deserved.
+		const self = stubInstance({ allowGuardedActions: true }, { set_all_channels: 'No', channel_enable_2: 'Off' })
+		self.unconfirmed.add('DB_L2174_SET_ALL')
+		UpdateActions(self)
+		await self.definitions.set_lnb_power.callback({ options: { channel: '1', value: 'On' } })
+
+		const warned = self.logs.find((l) => l.message.includes('apply to all'))
+		assert.ok(warned, 'a flag in flight is not knowledge')
+		assert.match(warned.message, /not read back yet/)
+		assert.match(warned.message, /channel 1, 3, 4/, 'the channels it does know about are still used')
+	})
+
+	it('does not sound certain about a flag that is still in flight', async () => {
+		// The half the test above leaves open: the last poll said `Yes`, and a
+		// press is on its way to change it. Reading the stale `Yes` would
+		// produce the confident sentence about a value that is in motion.
+		const self = stubInstance({ allowGuardedActions: true }, { set_all_channels: 'Yes', channel_enable_1: 'On' })
+		self.unconfirmed.add('DB_L2174_SET_ALL')
+		UpdateActions(self)
+		await self.definitions.set_lnb_power.callback({ options: { channel: '1', value: 'On' } })
+
+		const warned = self.logs.find((l) => l.message.includes('apply to all'))
+		assert.ok(warned, 'the warning still has to come')
+		assert.match(warned.message, /not read back yet/, 'and it must not claim to know')
 	})
 
 	it('stays quiet when the receiver applies settings per channel', async () => {

@@ -222,17 +222,11 @@ export class LynxApi {
 	 */
 	#destroyed = false
 	#queue: Promise<unknown> = Promise.resolve()
-	#pending = 0
 
 	constructor(options: LynxApiOptions, log: ApiLogger) {
 		this.#options = options
 		this.#log = log
 		this.resetAgent()
-	}
-
-	/** Number of in-flight requests, used to avoid queueing up polls. */
-	get pending(): number {
-		return this.#pending
 	}
 
 	updateOptions(options: LynxApiOptions): void {
@@ -375,7 +369,6 @@ export class LynxApi {
 			throw new Error('Refusing to write: the connection was pointed at a different receiver')
 		}
 
-		this.#pending++
 		try {
 			return await new Promise<string>((resolveRaw, rejectRaw) => {
 				// `req.setTimeout` below is a *socket* timeout: it only starts once the
@@ -452,8 +445,6 @@ export class LynxApi {
 
 			error.message = message
 			throw error
-		} finally {
-			this.#pending--
 		}
 	}
 }

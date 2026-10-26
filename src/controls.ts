@@ -549,6 +549,23 @@ export const PUBLISHED_IDS: Partial<Record<keyof ActionsSchema, { option: string
 	set_status_pin_alarm_level: { option: 'value', setting: 'status_pin_alarm_level' },
 }
 
+/**
+ * The receiver flag that `widenedBySetAll` rows answer to, if the table still
+ * has it.
+ *
+ * Found by the device's own parameter name rather than by our id, so renaming
+ * the row cannot quietly detach the warning from the thing it warns about.
+ *
+ * Deliberately `undefined` rather than a throw when the row is gone: the two
+ * checks below report their problems and let the module run, and a missing row
+ * here must not be the one thing that stops Companion loading it at all — the
+ * 22 monitoring buttons have nothing to do with this flag. The caller treats a
+ * missing row as "assume the flag is on", which is the safe direction anyway.
+ */
+export const SET_ALL_SETTING: ControlSetting | undefined = CONTROL_SETTINGS.find(
+	(setting) => setting.parameter === 'DB_L2174_SET_ALL',
+)
+
 /** Rows whose ids have drifted from what buttons were saved with. */
 export function driftedControlIds(): string[] {
 	const problems: string[] = []

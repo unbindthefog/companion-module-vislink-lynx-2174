@@ -413,6 +413,19 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		return false
 	}
 
+	/**
+	 * Has this parameter been written without having been read back yet?
+	 *
+	 * `state.settings` only moves on a successful poll, so a value this module
+	 * wrote moments ago still reads as the old one. For anything that decides
+	 * whether to warn, that is not knowledge — it is a stale answer, and it
+	 * goes quiet exactly when the press it would warn about is the dangerous
+	 * one.
+	 */
+	isUnconfirmed(parameter: string): boolean {
+		return this.#pendingWrites.has(parameter) || this.#queuedWrites.has(parameter) || this.#inFlight.has(parameter)
+	}
+
 	/** Stop waiting on one parameter, without touching the others. */
 	#forgetPendingWrite(name: string): void {
 		const pending = this.#pendingWrites.get(name)
@@ -574,6 +587,14 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.#isPolling = true
 		try {
 			const params = await api.getParameters()
+			// The one check the read path was missing while every write path had
+			// it twice. A poll can be in flight for the whole socket timeout, and
+			// the connection can be pointed elsewhere or taken down in the
+			// meantime — `#connect()` sets `#api` to a new client or to null.
+			// Applying this answer then overwrites a fresh "no address
+			// configured" status with a stale failure whose retry never comes,
+			// because the poll loop stops when there is no client.
+			if (this.#api !== api) return
 			const values = buildVariableValues(params)
 
 			this.#updateState(values)
@@ -617,6 +638,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 				this.#hasLoggedSuccess = true
 			}
 		} catch (e) {
+			// Same check on the way out: a failure belongs to the connection that
+			// caused it, and saying so about a connection that has since been
+			// replaced or removed is worse than saying nothing.
+			if (this.#api !== api) return
 			const message = e instanceof Error ? e.message : String(e)
 			const failure = classifyFailure((e as NodeJS.ErrnoException)?.code)
 			this.#hasLoggedSuccess = false

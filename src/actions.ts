@@ -1,6 +1,12 @@
 import type ModuleInstance from './main.js'
 import { guardedActionsEnabled, writesAllowed } from './config.js'
-import { CONTROL_CHANNELS, CONTROL_SETTINGS, type ControlSetting, controlParameter } from './controls.js'
+import {
+	CONTROL_CHANNELS,
+	CONTROL_SETTINGS,
+	type ControlSetting,
+	SET_ALL_SETTING,
+	controlParameter,
+} from './controls.js'
 
 /**
  * What this module will change on the receiver.
@@ -93,6 +99,7 @@ function controlAction(
 	write: Write,
 	warn: (message: string) => void,
 	settings: () => Record<string, string | undefined>,
+	unconfirmed: (parameter: string) => boolean,
 ) {
 	const channelOption = {
 		type: 'dropdown' as const,
@@ -138,12 +145,19 @@ function controlAction(
 			// re-reads: with the receiver's "apply to all" flag on — its shipped
 			// state — this reaches every enabled channel, so the press does more
 			// than the channel picker above it suggests.
-			// Unknown counts as on: the flag is only unknown before the first
-			// poll or after contact was lost, and the receiver ships with it
-			// set. Warning too often costs a line in the log; staying quiet
-			// costs voltage on a coax nobody meant to touch.
-			if (setting.widenedBySetAll && settings().set_all_channels !== 'No') {
-				const known = settings().set_all_channels === 'Yes'
+			// Unknown counts as on: the flag is unknown before the first poll,
+			// after contact was lost, and — the case that matters — while a
+			// press that changed it is still waiting to be read back. Someone
+			// who sets "apply to all" to Yes and then presses downconverter
+			// power within the poll interval would otherwise get no warning at
+			// the one moment it is most deserved. Warning too often costs a
+			// line in the log; staying quiet costs voltage on a coax nobody
+			// meant to touch.
+			// No row means the table lost it; warn as if the flag were on, which
+			// is the same direction every other unknown is treated in here.
+			const flagPending = SET_ALL_SETTING === undefined || unconfirmed(SET_ALL_SETTING.parameter)
+			if (setting.widenedBySetAll && (flagPending || settings().set_all_channels !== 'No')) {
+				const known = !flagPending && settings().set_all_channels === 'Yes'
 				const reached = CONTROL_CHANNELS.filter((n) => settings()[`channel_enable_${n}`] !== 'Off')
 				warn(
 					known
@@ -191,7 +205,15 @@ export function UpdateActions(self: ModuleInstance): void {
 
 	for (const setting of CONTROL_SETTINGS) {
 		definitions[setting.actionId] =
-			setting.guarded && !guarded ? undefined : controlAction(setting, write, warn, () => self.state.settings)
+			setting.guarded && !guarded
+				? undefined
+				: controlAction(
+						setting,
+						write,
+						warn,
+						() => self.state.settings,
+						(parameter) => self.isUnconfirmed(parameter),
+					)
 	}
 
 	// Typed separately from the loop above so the SDK still ties each option id
