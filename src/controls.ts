@@ -74,6 +74,12 @@ export type ControlSetting = {
 	 * action builder, so a rename cannot drop the warning in silence.
 	 */
 	widenedBySetAll?: boolean
+	/**
+	 * Keep this row out of the ready-made buttons. It still has an action, a
+	 * variable and a `setting_is` feedback — it is just not something to hand
+	 * anyone as a button.
+	 */
+	noPreset?: boolean
 	/** Shown under the action's name in Companion. */
 	description?: string
 	/** Overrides the generated "Set <label>" action name. */
@@ -181,6 +187,11 @@ export const CONTROL_SETTINGS: readonly ControlSetting[] = [
 		section: 'rf',
 		keywords: ['all', 'channels', 'downconverter', 'together'],
 		actionName: 'Apply channel settings to all',
+		// No ready-made button. This is a mode, not a setting anyone operates:
+		// pressing it changes what *other* buttons reach, and nothing on those
+		// buttons would show it. Whoever needs to change it can build the
+		// action, which is a deliberate enough act for something this quiet.
+		noPreset: true,
 		description:
 			'While this is Yes, setting a downconverter value on one channel sets it on every *enabled* channel — including the supply voltage. The bench unit shipped with it on.',
 	},

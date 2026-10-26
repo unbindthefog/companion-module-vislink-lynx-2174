@@ -55,7 +55,7 @@ Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
 | `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
 | `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
 
-Seit dem 22.10. gibt es zusätzlich `yarn test`: 85 Prüfungen ohne Gerät, die
+Seit dem 22.10. gibt es zusätzlich `yarn test`: 88 Prüfungen ohne Gerät, die
 festhalten, **was jede Action schreibt** — jede Tabellenzeile, jeder Wert, alle
 vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
 die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür

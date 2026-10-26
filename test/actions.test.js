@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { UpdateActions } from '../dist/actions.js'
+import { UpdatePresets } from '../dist/presets.js'
 import { GUARDED_PARAMETERS, SAFE_PARAMETERS } from '../dist/api.js'
 import {
 	CONTROL_CHANNELS,
@@ -226,6 +227,57 @@ describe('the actions that are not a choice between fixed values', () => {
 
 		assert.deepEqual(self.writes, [])
 		assert.match(self.logs.at(-1).message, /empty web ID/)
+	})
+})
+
+describe('a row can have an action without a button', () => {
+	const buildPresets = (config) => {
+		let out = null
+		UpdatePresets({ config, setPresetDefinitions: (sections, presets) => (out = { sections, presets }) })
+		return out
+	}
+	const presetsFor = (config) => buildPresets(config).presets
+
+	it('offers no ready-made button for apply-to-all, at any switch setting', () => {
+		for (const config of [
+			{ readOnly: false, allowGuardedActions: false },
+			{ readOnly: false, allowGuardedActions: true },
+			{ readOnly: true, allowGuardedActions: false },
+		]) {
+			const named = Object.keys(presetsFor(config)).filter((id) => id.includes('all_channels'))
+			assert.deepEqual(named, [], `apply-to-all must stay off the button list (${JSON.stringify(config)})`)
+		}
+	})
+
+	it('still offers the action, so it can be changed deliberately', () => {
+		const self = stubInstance()
+		UpdateActions(self)
+		assert.ok(self.definitions.set_all_channels, 'the action is the way to change it')
+	})
+
+	it('keeps every other row on the button list, with its own group', () => {
+		// Guards the opposite mistake: a `noPreset` flag that spreads, or a
+		// `continue` placed one line too early.
+		//
+		// Matched on the group id rather than on a preset-id prefix. A prefix
+		// lets a neighbour stand in for a missing row — `set_diversity_delay_*`
+		// starts with `set_diversity`, so losing every button of the
+		// `diversity` row would have left this green.
+		const { sections, presets } = buildPresets({ readOnly: false, allowGuardedActions: true })
+		const groups = new Map(sections.flatMap((section) => section.definitions.map((d) => [d.id, d])))
+
+		for (const setting of CONTROL_SETTINGS) {
+			const group = groups.get(`set_${setting.id}`)
+			if (setting.noPreset) {
+				assert.equal(group, undefined, `${setting.id} must not leave an empty group behind`)
+				continue
+			}
+			assert.ok(group, `${setting.id} lost its group`)
+			assert.ok(group.presets.length > 0, `${setting.id} has a group with no buttons in it`)
+			for (const id of group.presets) {
+				assert.ok(presets[id], `${setting.id} points at a button that does not exist: ${id}`)
+			}
+		}
 	})
 })
 

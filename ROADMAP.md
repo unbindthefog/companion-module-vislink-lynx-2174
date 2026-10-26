@@ -19,7 +19,7 @@ against that same receiver (all 39 variables populate correctly; see the
       power/MER/temperature/voltage threshold — each with a below/above
       direction rather than the comparison baked into the name
 - [x] Load the module into a real Companion instance and verify against the receiver
-- [x] Presets: 151 ready-made buttons in seven sections (Signal, Decoder,
+- [x] Presets: 149 ready-made buttons in seven sections (Signal, Decoder,
       Control — RF / Routing / Video / Unit, Unit)
 
 ### Verified against real hardware (2026-09-04)
@@ -103,9 +103,12 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       actions" switch (preset recall/store, reboot, and the four downconverter
       supplies, which put DC on an antenna input), and everything else is
       refused whatever the switch says
-- [x] Implement — 29 actions, and one Control button per value for the 24 that
-      are a choice rather than a number, all built from one table
-      (`src/controls.ts`). Preset recall, preset store and
+- [x] Implement — 29 actions, and one Control button per value for 23 of the
+      24 rows that are a choice rather than a number, all built from one table
+      (`src/controls.ts`). The twenty-fourth, `Apply channel settings to all`,
+      has an action but no ready-made button on purpose: it is a mode that
+      changes what *other* buttons reach, and none of those buttons could show
+      it. Preset recall, preset store and
       reboot are absent from the action list until the switch is on, rather
       than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
       material stay refused outright
@@ -163,7 +166,7 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      85 assertions in under a second, no device and no Companion. It pins what
+      88 assertions in under a second, no device and no Companion. It pins what
       each action writes — every row of the table, every value, all four
       channels — against a hand-written list of parameter names rather than
       against the table itself, so a typo there fails rather than agreeing with

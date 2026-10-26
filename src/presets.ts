@@ -241,7 +241,10 @@ export function UpdatePresets(self: ModuleInstance): void {
 	presets['genlock'] = monitorPreset({
 		name: 'Frame lock (genlock)',
 		keywords: ['genlock', 'frame', 'lock', 'reference', 'sync'],
-		style: { ...OK_STYLE, text: `GENLOCK\n$(${SELF}:genlock)`, size: '14' },
+		// 28 rather than one of the named steps ('14', '18', '24'…): the caption
+		// is one long word over a short reading, and 24 left it small while 30
+		// clipped it. The type takes a plain number for exactly this.
+		style: { ...OK_STYLE, text: `GENLOCK\n$(${SELF}:genlock)`, size: 28 },
 		feedbacks: [
 			{ feedbackId: 'genlock_failed', options: {}, style: ALARM_STYLE, headline: 'Reference lost' },
 			// Grey while frame lock is switched off. The receiver reports OK in
@@ -399,6 +402,8 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// A preset whose action the switch has removed would reach the button as
 		// "unknown action", so it is not offered either.
 		if (setting.guarded && !guardedOn) continue
+		// Some rows have an action but no button, by choice — see `noPreset`.
+		if (setting.noPreset) continue
 		addControl(setting)
 	}
 
@@ -413,9 +418,9 @@ export function UpdatePresets(self: ModuleInstance): void {
 	if (writes) {
 		presets['set_frequency'] = {
 			type: 'simple',
-			name: 'Retune — set receive frequency',
+			name: 'Frequency — set receive frequency',
 			keywords: ['frequency', 'tune', 'ghz', 'retune'],
-			style: { ...READOUT_STYLE, text: `TUNE 2.325\n$(${SELF}:rf_frequency)`, size: '7' },
+			style: { ...READOUT_STYLE, text: `FREQ 2.325\n$(${SELF}:rf_frequency)`, size: '7' },
 			feedbacks: [unknownCover('unit')],
 			steps: [{ down: [{ actionId: 'set_frequency', options: { frequency: 2.325 } }], up: [] }],
 		}
@@ -519,10 +524,10 @@ export function UpdatePresets(self: ModuleInstance): void {
 			description: CONTROL_SECTIONS[key].description,
 			definitions: [
 				...groups[key],
-				// Retune and the preset buttons are not choices between fixed values,
+				// Frequency and the preset buttons are not choices between fixed values,
 				// so they are not in the table — they join their section here.
 				...(key === 'rf'
-					? [{ id: 'set_frequency', type: 'simple' as const, name: 'Retune', presets: ['set_frequency'] }]
+					? [{ id: 'set_frequency', type: 'simple' as const, name: 'Frequency', presets: ['set_frequency'] }]
 					: []),
 				...(key === 'unit' && presetSlots.length
 					? [

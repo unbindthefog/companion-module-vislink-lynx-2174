@@ -196,8 +196,8 @@ surely as too little. Its preset stacks four feedbacks: green from −6 to
 
 ## Presets
 
-The module ships 110 ready-made buttons you can drag straight onto a page, or
-151 with the interrupting actions switched on — and 22, the monitoring ones
+The module ships 108 ready-made buttons you can drag straight onto a page, or
+149 with the interrupting actions switched on — and 22, the monitoring ones
 alone, under read only.
 Monitoring first, then one button per value for everything the actions can set:
 
@@ -205,7 +205,7 @@ Monitoring first, then one button per value for everything the actions can set:
 | --------------------- | ---------------------------------------------------------------------------- |
 | **Signal**            | RF lock plus power and MER as traffic lights — one of each per channel (1–4) |
 | **Decoder**           | Video lock, detected video format, audio 1 + 2 lock                          |
-| **Control — RF**      | Receive mode, bandwidth, guard interval, polarity, channel enable, retune    |
+| **Control — RF**      | Receive mode, bandwidth, guard interval, polarity, channel enable, frequency |
 | **Control — Routing** | Decoder source, ASI and IP output source, the three diversity inputs, delay  |
 | **Control — Video**   | Video input mode, genlock, on-signal-loss, both output formats, the overlay  |
 | **Control — Unit**    | Status pin mode, state and alarm level                                       |
@@ -311,6 +311,12 @@ channel rather than the one addressed — and the unit tested here shipped with 
 on. It is exposed as `Apply channel settings to all` so you can see and change
 it; while it is `Yes`, `Set downconverter power` for channel 1 energises every
 enabled channel, not only the one the button names. Channel enable itself is unaffected.
+
+There is deliberately no ready-made button for it. It is a mode rather than a
+setting anyone operates: changing it alters what *other* buttons reach, and
+nothing on those buttons would show it. The action is there for whoever needs
+it, and building a button is a deliberate enough act for something this quiet.
+The `set_all_channels` variable shows where it stands.
 
 Writes are read back. The receiver answers every write with `200` even when it
 discards the value, so the module polls again afterwards and logs a warning if
