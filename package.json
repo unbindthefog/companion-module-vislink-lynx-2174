@@ -12,7 +12,7 @@
 		"dev": "tsc -p tsconfig.build.json --watch",
 		"lint:raw": "eslint",
 		"lint": "run lint:raw .",
-		"test": "run build && node --test test/"
+		"test": "run build && node --test test/*.test.js"
 	},
 	"license": "MIT",
 	"repository": {
