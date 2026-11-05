@@ -110,15 +110,21 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
  * included — and that last part is the one worth spelling out, because the
  * sister modules answer it differently and for good reason.
  *
- * An absent key means a connection older than this switch. What such a
- * connection could do before depends on the module: where writing already
- * existed, taking it away would be a regression, so there the absent key
- * keeps writing. Here it never existed. `v0.1.1` shipped
- * `setActionDefinitions({})` with the comment "No actions yet — this module
- * is deliberately read-only", and `config.ts` had no `readOnly` field at all.
- * A connection from that version could not write if it wanted to, so locking
- * it takes nothing away — while unlocking it would hand a live receiver a
- * full set of actions on an upgrade nobody treated as a change.
+ * An absent key means a connection made before this switch existed, and such
+ * a connection *could* write: the actions arrived in `db46ba7`, the switch
+ * only in `32abc11`, and the manifest said `0.1.1` throughout. Locking it
+ * therefore takes something away, deliberately.
+ *
+ * Why that is the right trade here: the module has never been in the store,
+ * so no stranger owns such a connection — only the ones made on this bench
+ * while it was being built. For those, the cost of locking is ticking a box
+ * once; the cost of not locking is a receiver that may be on air silently
+ * gaining a full action list on an upgrade nobody treated as a change.
+ *
+ * The sister modules answer this the other way round, and are right to:
+ * their connections have been writing for longer than ours, and the same
+ * reasoning lands on the other side. That is a decision per module, not
+ * drift — compare before copying either answer.
  */
 export function writesAllowed(self: { config?: ModuleConfig }): boolean {
 	// Only an explicit `false` writes. Everything else locks, because
@@ -130,7 +136,8 @@ export function writesAllowed(self: { config?: ModuleConfig }): boolean {
 	// anything it does not recognise.
 	//
 	// The missing key locks as well — see the note above for why that is right
-	// here and wrong in a module that could already write.
+	// here and wrong in a module whose connections have been writing for real
+	// users.
 	const value = self.config?.readOnly
 	return value === false
 }

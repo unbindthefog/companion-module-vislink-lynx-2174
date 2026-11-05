@@ -172,12 +172,17 @@ called, which also retires the finding carried since `db46ba7`. **On by
 default since 2026-10-26**, before the first release rather than after: a
 default is free to choose until someone else's connections depend on it, and
 the wrong one here costs a write nobody intended, not a tick in a dialog.
-Existing connections are unaffected, and the reason is Companion's, not ours:
-it applies a field's default only on a connection's first init, writes it into
-the stored config there, and never fills a missing field in afterwards. So a
-connection older than the switch keeps writing, and `src/upgrades.ts` stays
-empty on purpose — a migration here would silence exactly the connections that
-are meant to be left alone.
+Companion applies a field's default only on a connection's first init, writes
+it into the stored config there, and never fills a missing field in
+afterwards. A connection made before the switch existed therefore has no
+stored value at all — and since 2026-11-05 that case locks too. Those
+connections _could_ write (the actions landed in `db46ba7`, the switch only in
+`32abc11`), so this takes something away on purpose: the module has never been
+in the store, so the only ones affected are the connections made on this
+bench, and ticking a box once is cheaper than a receiver that may be on air
+quietly gaining an action list on an upgrade. `src/upgrades.ts` stays empty
+all the same — a changed default never gets a migration, and here there is
+nothing to migrate anyone to.
 
 Still open on the control side:
 

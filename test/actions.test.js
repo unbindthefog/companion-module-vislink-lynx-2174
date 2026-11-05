@@ -309,14 +309,14 @@ describe('the write switch only opens for an explicit no', () => {
 		assert.equal(writes(false), true, 'the box was unticked on purpose')
 	})
 
-	it('locks a connection older than the switch, because that one could never write', () => {
-		// Module-specific, and the sister modules answer it the other way: an
-		// absent key means a connection from before the switch existed, and
-		// what such a connection could do depends on the version it came from.
-		// `v0.1.1` of this module shipped `setActionDefinitions({})` and had no
-		// `readOnly` field at all, so locking takes nothing away — while
-		// unlocking would hand a live receiver a full action list on an upgrade
-		// nobody treated as a change.
+	it('locks a connection older than the switch, even though that one could write', () => {
+		// Module-specific, and the sister modules answer it the other way. An
+		// absent key means a connection made before the switch existed — and
+		// here such a connection could write, because the actions landed
+		// before the switch did. Locking it takes that away on purpose: the
+		// module was never in the store, so the only connections affected are
+		// the ones made on this bench, and ticking a box once is cheaper than
+		// a live receiver quietly gaining an action list on an upgrade.
 		assert.equal(writes(undefined), false)
 		assert.equal(writesAllowed({}), false, 'and before the first configUpdated')
 	})
