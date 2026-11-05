@@ -44,7 +44,11 @@ the module automatically when files change.
 | Path                     | Purpose                                                               |
 | ------------------------ | --------------------------------------------------------------------- |
 | `src/main.ts`            | Instance lifecycle, polling loop, status handling                     |
-| `src/api.ts`             | Serialized HTTP client that fetches and parses `data.xml`             |
+| `src/api.ts`             | Serialized HTTP client, the write allowlist and the write guards      |
+| `src/controls.ts`        | The one table every action, variable and control preset is built from |
+| `src/actions.ts`         | Action definitions, built from that table                             |
+| `src/presets.ts`         | Ready-made buttons, built from the same table                         |
+| `src/config.ts`          | Connection settings and the two switches that gate writing            |
 | `src/variables.ts`       | Variable definitions and the pure params → variable mapping           |
 | `src/feedbacks.ts`       | Feedback definitions                                                  |
 | `src/types.ts`           | Raw parameter shape and the alarm-bit / channel-id constants          |

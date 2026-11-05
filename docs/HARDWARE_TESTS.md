@@ -9,11 +9,11 @@ Einschwingzeiten in `LYNX_L2174_API.md` §6 stehen.
 Das Modul schreibt inzwischen 36 Parameter. Vor dem ersten Tastendruck gehört
 geklärt, **welcher** Receiver vor einem steht:
 
-| Gerät                                                           | Was erlaubt ist                |
-| --------------------------------------------------------------- | ------------------------------ |
-| Laborgerät, nicht auf Sendung                                   | alles aus diesem Dokument      |
-| Ersatzgerät im Rack, nicht zugeschaltet                         | alles außer Abschnitt 5        |
-| Produktivgerät auf Sendung (K7 `10.81.5.131`, K6 `10.81.5.132`) | **nichts** aus diesem Dokument |
+| Gerät                                   | Was erlaubt ist                |
+| --------------------------------------- | ------------------------------ |
+| Laborgerät, nicht auf Sendung           | alles aus diesem Dokument      |
+| Ersatzgerät im Rack, nicht zugeschaltet | alles außer Abschnitt 5        |
+| Produktivgerät auf Sendung (K7, K6)     | **nichts** aus diesem Dokument |
 
 Der Grund für die letzte Zeile ist nicht Vorsicht um ihrer selbst willen:
 `iframe.php` kennt keine Authentifizierung und keine Bestätigung. Ein Write ist
@@ -32,7 +32,7 @@ diff <(grep -o '<name>.*</value>' vorher.xml) <(grep -o '<name>.*</value>' nachh
 
 ## Was schon nachgewiesen ist
 
-Alles am Laborgerät `10.81.5.149` („Rx Relais", V1039), ohne Antenne und ohne
+Alles am Laborgerät („Rx Relais", V1039), ohne Antenne und ohne
 Signal, am 20.10.2026.
 
 | Action                | Nachweis                                                                       |
@@ -55,7 +55,7 @@ Am 22.10.2026 kamen die beiden unumkehrbaren dazu:
 | `recall_preset`   | zweiter Slot (16: LMST(S) / 10 MHz / FEC 2/3); `DB_IP_ADDRESS` erneut unangetastet                                             |
 | `reboot_receiver` | nach **20 s** wieder ansprechbar, Konfiguration unverändert; dazwischen `ECONNREFUSED`, Timeout und `HTTP 404` auf `/data.xml` |
 
-Seit dem 22.10. gibt es zusätzlich `yarn test`: 96 Prüfungen ohne Gerät, die
+Seit dem 22.10. gibt es zusätzlich `yarn test`: 104 Prüfungen ohne Gerät, die
 festhalten, **was jede Action schreibt** — jede Tabellenzeile, jeder Wert, alle
 vier Kanäle, gegen eine handgeschriebene Liste der Parameternamen statt gegen
 die Tabelle selbst. Was dort nicht drinsteht, ist die Wirkung am Gerät; dafür
@@ -63,7 +63,7 @@ sind die Abschnitte unten da.
 
 Am 26.10.2026 kamen die restlichen **18** dazu, alle über eine echte
 Companion-Taste: dafür wurde in Companion die temporäre Seite 4 („Labor-Test")
-angelegt, ausschließlich auf der Verbindung `lynx-labor` → `10.81.5.149`, die
+angelegt, ausschließlich auf der Verbindung `lynx-labor` zum Laborgerät, die
 Presets aus dem Modul daraufgezogen und über
 `POST /api/location/4/<row>/<col>/press` gedrückt. Vor und nach jedem Druck
 wurde `data.xml` gelesen und verglichen. `set_guard_interval` war schon am

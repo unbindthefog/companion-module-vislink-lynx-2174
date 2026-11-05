@@ -623,6 +623,24 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		if (target !== this.#connectedTo) this.#forgetPendingWrites(true)
 		this.#connectedTo = target
 
+		// Switching the connection to read only drops what is still waiting too.
+		// The write would be refused anyway — `api.ts` re-checks as the request
+		// leaves — but it would be refused *later*, once per held value and six
+		// seconds apart, each as a red error line. Someone who has just made a
+		// receiver safe should not be told off for it.
+		if (!writesAllowed(this)) {
+			for (const [name, queued] of this.#queuedWrites) {
+				this.log('info', `Not setting ${name} = ${queued.value}: this connection is read only now`)
+			}
+			this.#queuedWrites.clear()
+			this.#stopRelease()
+			// And the checks already armed, for the same reason: a write that
+			// went out just before the switch was set would otherwise report
+			// "the receiver may have rejected it" up to a verify window later —
+			// the red line this block exists to avoid, only delayed.
+			this.#forgetPendingWrites()
+		}
+
 		if (!host) {
 			// Without this the previous client survives: the buttons would keep the
 			// last good poll's colours for ever, and — worse — an action would still

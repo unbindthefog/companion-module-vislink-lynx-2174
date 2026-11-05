@@ -195,9 +195,17 @@ describe('the write guards, at the moment a request leaves', () => {
 		const port = await new Promise((resolve) => empty.listen(0, '127.0.0.1', () => resolve(empty.address().port)))
 
 		const api = new LynxApi(options(port), quiet)
-		await assert.rejects(() => api.getParameters(), /contained no parameters/)
-		api.destroy()
-		empty.closeAllConnections?.()
-		await new Promise((resolve) => empty.close(resolve))
+		try {
+			await assert.rejects(() => api.getParameters(), /contained no parameters/)
+		} finally {
+			// In a `finally`: a failed assertion would otherwise leave this
+			// server listening, and the suite would hang instead of failing.
+			// Under CI that burns the job's time limit rather than reporting a
+			// reason. The two shared servers are covered by `after()`, which
+			// node:test runs either way; this one is local to the test.
+			api.destroy()
+			empty.closeAllConnections?.()
+			await new Promise((resolve) => empty.close(resolve))
+		}
 	})
 })

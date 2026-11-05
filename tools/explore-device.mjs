@@ -6,7 +6,7 @@
  * Recorded reality beats memory: without this, every later question about the
  * device needs the device.
  *
- *   node tools/explore-device.mjs 10.81.5.131 --out fixtures/k7
+ *   node tools/explore-device.mjs <receiver-address> --out fixtures/<name>
  *
  * Safety. The receiver's write path is `GET /common/iframe.php?param=…&value=…`
  * — a plain GET carrying a query string, with no HTTP method to warn anyone off.

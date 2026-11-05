@@ -25,7 +25,7 @@ against that same receiver (all 39 variables populate correctly; see the
 ### Verified against real hardware (2026-09-04)
 
 Loaded via Companion's developer-modules path against a production L2174
-(`10.81.5.131`, Web ID "K7", build V1039). All 39 variables came through with
+(a unit in service, Web ID "K7", build V1039). All 39 variables came through with
 live values (channel lock/power/MER, temperatures, BER, alarms); connection
 status green, no errors logged.
 
@@ -96,7 +96,7 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
 
 - [x] Verify the pattern above against a lab unit, starting with a harmless,
       easily-reversible parameter (`DB_L2174_WEB_TEXT`) — done 2026-10-20 on
-      "Rx Relais" (`10.81.5.149`), see `docs/LYNX_L2174_API.md` §6
+      the bench unit "Rx Relais", see `docs/LYNX_L2174_API.md` §6
 - [x] Decide which of the 88 GUI-writable parameters are safe and useful as
       Companion actions — a two-tier allowlist in `src/api.ts`: 28 parameters
       are always writable, 8 more only with the connection's "interrupting
@@ -112,7 +112,7 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       reboot are absent from the action list until the switch is on, rather
       than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
       material stay refused outright
-- [x] Verify on the lab unit (`10.81.5.149`, 2026-10-20): the first six
+- [x] Verify on the lab unit (2026-10-20): the first six
       actions, preset recall end to end (30 parameters changed, the receiver
       put the recall trigger back to `No` by itself, the IP address untouched),
       and `DB_DECOD_FREEZE_ON_LOSS` from the new batch
@@ -155,6 +155,16 @@ a wrong value kills reception silently); the CCU and L1500 return path (not
 testable without a camera and a modem). `DB_L2174_SET_ALL` turned out not to be a
 momentary trigger at all but a mode, and is now exposed — see the entry above.
 
+Unfinished buttons (2026-10-30): a choice action dragged onto a button starts
+on `— pick one —` rather than on the first entry of its value list. That entry
+was arbitrary, and for five rows it was the switching-off direction, so a
+button saved without touching the dropdown switched something off on its first
+press. The receiver's factory defaults are not documented anywhere we can
+read, so there is no honest value to pre-fill with; the placeholder is refused
+by the same check that refuses any value the receiver does not offer, with a
+line that names the button rather than blaming the device. Ready-made presets
+were never affected — they carry their value explicitly.
+
 Read only (2026-10-22): a per-connection switch that empties the action list,
 drops the control presets and refuses the write in `src/api.ts` as well — the
 last of those at the moment the request leaves the queue, not when the action is
@@ -176,7 +186,7 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      96 assertions in about half a minute, no device and no Companion — the
+      104 assertions in about half a minute, no device and no Companion — the
       write-path tests wait on real timers for outages and the spacing between
       held writes, which is where that time goes. It pins what
       each action writes — every row of the table, every value, all four

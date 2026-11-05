@@ -33,7 +33,7 @@ than a list of things to avoid.
 | Receiver address     | IP address or hostname of the L2174.                                                                        |
 | Port                 | Normally `80`.                                                                                              |
 | Poll interval        | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second. |
-| Read only            | **On by default.** While on there are no actions, no control presets, and nothing is ever written.           |
+| Read only            | **On by default.** While on there are no actions, no control presets, and nothing is ever written.          |
 | Interrupting actions | Off by default, and hidden while read only is on. Preset recall and store, reboot and downconverter power.  |
 
 There is nothing to configure about the transport — the receiver serves
@@ -143,7 +143,7 @@ the one currently out of view will not turn green even though it worked.
 | `alarm_summary` | `High Temperature, RF not Locked`, or empty when clear |
 
 `alarm_summary` is decoded from the receiver's own alarm bitfield — see
-`docs/LYNX_L2174_API.md` §5 for the full bit-to-name mapping.
+[`docs/LYNX_L2174_API.md`](https://github.com/unbindthefog/companion-module-vislink-lynx-2174/blob/main/docs/LYNX_L2174_API.md) §5 for the full bit-to-name mapping (in German).
 
 ### Diagnostics
 
@@ -206,10 +206,10 @@ surely as too little. Its preset stacks four feedbacks: green from −6 to
 
 ## Presets
 
-The module ships 108 ready-made buttons you can drag straight onto a page, or
-149 with the interrupting actions switched on — and 22, the monitoring ones
-alone, under read only.
-Monitoring first, then one button per value for everything the actions can set:
+A new connection is read only, so it offers 22 ready-made buttons: the
+monitoring ones. Clear that switch and there are 108, with one per value for
+everything the actions can set — 149 once the interrupting actions are on too.
+Monitoring first, then the control sections:
 
 | Section               | Buttons                                                                      |
 | --------------------- | ---------------------------------------------------------------------------- |
@@ -299,6 +299,15 @@ until the setting is on again. Nothing on the button says so — worth knowing
 before wondering why it stopped working. The same is true under read only,
 except there the connection list says `Read only`, which is at least a place to
 look.
+
+**A button you drag on is not finished yet.** Every action that chooses
+between fixed values starts on `— pick one —`, and the number fields —
+frequency, preset slot — start on `0`, which is not a value the receiver has.
+Press such a button before you have set its value and nothing is written; the
+log says which button it was. That is deliberate: the first entry of a value
+list is as good as any other, and for several settings it happens to be the
+switching-off one, so a button saved untouched would have switched something
+off on its first press.
 
 **Pressing twice for the same setting.** The receiver cannot take two values
 for one setting back to back: write three with five seconds between them and it

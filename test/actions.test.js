@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { UpdateActions } from '../dist/actions.js'
-import { GetConfigFields } from '../dist/config.js'
+import { GetConfigFields, guardedActionsEnabled, writesAllowed } from '../dist/config.js'
 import { UpdatePresets } from '../dist/presets.js'
 import { GUARDED_PARAMETERS, SAFE_PARAMETERS } from '../dist/api.js'
 import {
@@ -234,6 +234,106 @@ describe('the actions that are not a choice between fixed values', () => {
 
 		assert.deepEqual(self.writes, [])
 		assert.match(self.logs.at(-1).message, /empty web ID/)
+	})
+})
+
+describe('an unfinished button does nothing', () => {
+	it('starts every choice action with a placeholder, not a device value', () => {
+		// The first entry of a value list is arbitrary, and for five rows it is
+		// the switching-off direction. A button dragged on and saved untouched
+		// must not switch something off on its first press.
+		const { defs } = definitionsFor({ allowGuardedActions: true })
+		for (const setting of CONTROL_SETTINGS) {
+			const option = defs[setting.actionId].options.find((o) => o.id === setting.optionId)
+			assert.ok(option, `${setting.actionId} has no ${setting.optionId} option`)
+			assert.ok(
+				!setting.values.includes(option.default),
+				`${setting.actionId} is pre-filled with the device value ${JSON.stringify(option.default)}`,
+			)
+			assert.equal(option.choices[0].id, option.default, 'and the placeholder is offered in the list')
+		}
+	})
+
+	it('starts the number fields on a value the receiver cannot have', async () => {
+		// A number field cannot carry the placeholder, so it says the same
+		// thing with 0 — below the frequency range, and not a preset slot.
+		// `min` has to be 0 as well, or Companion's clamping lifts it into the
+		// valid range before the callback sees it.
+		const { defs } = definitionsFor({ allowGuardedActions: true })
+		for (const [actionId, optionId] of [
+			['set_frequency', 'frequency'],
+			['store_preset', 'preset'],
+			['recall_preset', 'preset'],
+		]) {
+			const option = defs[actionId].options.find((o) => o.id === optionId)
+			assert.equal(option.default, 0, `${actionId} must not start on a usable value`)
+			assert.equal(option.min, 0, `${actionId} would otherwise be clamped back up`)
+		}
+	})
+
+	it('writes nothing when a number field was left at 0', async () => {
+		const self = stubInstance({ allowGuardedActions: true })
+		UpdateActions(self)
+		await self.definitions.set_frequency.callback({ options: { frequency: 0 } })
+		await self.definitions.store_preset.callback({ options: { preset: 0 } })
+
+		assert.deepEqual(self.writes, [], 'an unfinished button must not reach the receiver')
+		assert.equal(
+			self.logs.filter((l) => l.message.includes('on this button yet')).length,
+			2,
+			'and each says which button it was',
+		)
+	})
+
+	it('refuses the placeholder with a reason that names the button, not the receiver', async () => {
+		const setting = CONTROL_SETTINGS.find((s) => s.actionId === 'set_channel_enable')
+		const self = stubInstance()
+		UpdateActions(self)
+		const placeholder = self.definitions.set_channel_enable.options.find((o) => o.id === setting.optionId).default
+		await self.definitions.set_channel_enable.callback({ options: { channel: '1', [setting.optionId]: placeholder } })
+
+		assert.deepEqual(self.writes, [], 'nothing may reach the receiver')
+		const warned = self.logs.find((l) => l.level === 'warn')
+		assert.match(warned.message, /no value chosen on this button yet/)
+	})
+})
+
+describe('the write switch only opens for an explicit no', () => {
+	// The switch decides whether a receiver that may be on air can be written
+	// to, so it is read strictly: a value nobody chose is not consent, whether
+	// it happens to be truthy or falsy. An imported or hand-edited
+	// `.companionconfig` can carry either.
+	const writes = (readOnly) => writesAllowed({ config: { readOnly } })
+
+	it('writes only on a stored false', () => {
+		assert.equal(writes(false), true, 'the box was unticked on purpose')
+	})
+
+	it('locks a connection older than the switch, because that one could never write', () => {
+		// Module-specific, and the sister modules answer it the other way: an
+		// absent key means a connection from before the switch existed, and
+		// what such a connection could do depends on the version it came from.
+		// `v0.1.1` of this module shipped `setActionDefinitions({})` and had no
+		// `readOnly` field at all, so locking takes nothing away — while
+		// unlocking would hand a live receiver a full action list on an upgrade
+		// nobody treated as a change.
+		assert.equal(writes(undefined), false)
+		assert.equal(writesAllowed({}), false, 'and before the first configUpdated')
+	})
+
+	it('locks on anything else, falsy values included', () => {
+		for (const value of [true, 1, 'yes', 'true', {}, null, 0, '', 'no', 'false']) {
+			assert.equal(writes(value), false, `${JSON.stringify(value)} must not be read as consent`)
+		}
+	})
+
+	it('keeps the guarded actions behind the write switch as well', () => {
+		assert.equal(guardedActionsEnabled({ config: { readOnly: false, allowGuardedActions: true } }), true)
+		assert.equal(
+			guardedActionsEnabled({ config: { readOnly: null, allowGuardedActions: true } }),
+			false,
+			'a locked connection offers nothing, whatever the second switch says',
+		)
 	})
 })
 

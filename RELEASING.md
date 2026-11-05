@@ -33,16 +33,27 @@ Semantic versioning:
 | minor | New backward-compatible variables, feedbacks, actions or presets.                  |
 | major | Breaking changes to config field names or shapes — **requires an upgrade script**. |
 
-A changed **default** of an existing field is a major change too, once the
-version it changes is published: every new connection then behaves differently
-from what the documentation promised. It is the one config change that must
-**not** get an upgrade script — Companion applies defaults only on a
-connection's first init, so existing connections keep their stored value, and
-a migration would reach back and change settings nobody touched.
+### Defaults
+
+Two rules, agreed across all four of our Companion modules (2026-10-28), and
+both learned here:
+
+**A default is free to choose until someone else depends on it.** Before the
+first release it is a decision; afterwards it is a change of behaviour for
+every new connection, and that makes it a major bump. So settle defaults
+before publishing, not after.
+
+**A changed default never gets an upgrade script.** Companion applies a
+field's default only on a connection's first init and never fills a missing
+field in later, so existing connections keep their stored value on their own. A
+migration would reach back and rewrite exactly the connections that are meant
+to be left alone.
 
 Keep the version identical in `package.json` and `companion/manifest.json`, and
-make the git tag `v` + that version. Config field changes need a migration added
-to `src/upgrades.ts` so existing users' connections keep working.
+make the git tag `v` + that version. A renamed or reshaped config field needs a
+migration added to `src/upgrades.ts` so existing users' connections keep
+working — a changed **default** is the one config change that must not get one,
+for the reason above.
 
 ## Pre-release checklist
 

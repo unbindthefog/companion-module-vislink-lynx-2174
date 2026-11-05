@@ -16,7 +16,7 @@
  * log, not a button press mid-show.
  *
  * Values come from the device's own `settings.xml`, read on the bench unit
- * (10.81.5.149, "Rx Relais", V1039), and they are the full sets rather than a
+ * ("Rx Relais", V1039), and they are the full sets rather than a
  * snapshot of what was selectable at the time.
  *
  * `enabled="no"` turned out to mean less than it looks. It marks what the web

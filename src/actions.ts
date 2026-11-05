@@ -94,6 +94,9 @@ function lowerFirst(label: string): string {
  * value the receiver does not accept cannot reach `iframe.php` — which answers
  * 200 to anything and would otherwise swallow a typo silently.
  */
+/** Shown in a dropdown nobody has chosen in yet. Deliberately not a device value. */
+const UNSET = '— pick one —'
+
 function controlAction(
 	setting: ControlSetting,
 	write: Write,
@@ -112,8 +115,24 @@ function controlAction(
 		type: 'dropdown' as const,
 		id: setting.optionId,
 		label: setting.label,
-		default: setting.values[0],
-		choices: setting.values.map((v) => ({ id: v, label: v })),
+		/**
+		 * What a freshly dragged-on action starts with: nothing, visibly.
+		 *
+		 * It used to be `setting.values[0]`, the first line of the value list.
+		 * That is arbitrary, and for five rows it is the switching-off
+		 * direction — `Set channel enable` came pre-filled with `Off`. A
+		 * button built by hand and saved without touching the dropdown then
+		 * switched something off on the first press. The ready-made buttons
+		 * were never affected; they carry their value explicitly.
+		 *
+		 * The receiver's factory defaults are not documented anywhere we can
+		 * read, so there is no honest value to pre-fill with. An entry that
+		 * says so is better than a guess that looks decided: it is not one of
+		 * `setting.values`, so the check below refuses it and says why, and
+		 * the press does nothing instead of the wrong thing.
+		 */
+		default: UNSET,
+		choices: [{ id: UNSET, label: UNSET }, ...setting.values.map((v) => ({ id: v, label: v }))],
 	}
 
 	return {
@@ -127,6 +146,13 @@ function controlAction(
 			// that check rather than reaching the receiver as "[object Object]".
 			const raw = action.options[setting.optionId]
 			const value = typeof raw === 'string' || typeof raw === 'number' ? String(raw) : ''
+			if (value === UNSET) {
+				// Its own line rather than the one below: "the receiver does not
+				// offer that value" is true of the placeholder but blames the
+				// wrong thing. The button was never finished.
+				warn(`Ignoring ${setting.label}: no value chosen on this button yet`)
+				return
+			}
 			if (!setting.values.includes(value)) {
 				warn(`Ignoring ${setting.label} ${JSON.stringify(value)}: the receiver does not offer that value`)
 				return
@@ -227,9 +253,16 @@ export function UpdateActions(self: ModuleInstance): void {
 				{
 					type: 'number',
 					id: 'frequency',
-					label: 'Frequency (GHz)',
-					default: 2.325,
-					min: 0.0068,
+					// Starts at 0, which is below the receiver's range and so
+					// cannot be a frequency anyone means. The old default was
+					// 2.325 — the value read off a receiver that was on air, not
+					// a factory setting — and an unfinished button would have
+					// retuned the demodulator to it on its first press. `min` is
+					// 0 for the same reason as the preset slot: `clampValues`
+					// would otherwise lift it into the valid range unasked.
+					label: 'Frequency in GHz (0.0068-10)',
+					default: 0,
+					min: 0,
 					max: 10,
 					step: 0.001,
 					clampValues: true,
@@ -242,6 +275,10 @@ export function UpdateActions(self: ModuleInstance): void {
 				const ghz = Number(action.options.frequency)
 				if (!Number.isFinite(ghz)) {
 					self.log('warn', `Ignoring frequency ${JSON.stringify(action.options.frequency)}: not a number`)
+					return
+				}
+				if (ghz === 0) {
+					self.log('warn', 'Ignoring frequency action: no frequency chosen on this button yet')
 					return
 				}
 				// Six decimals is what the receiver's own web form sends.
@@ -331,14 +368,26 @@ export function UpdateActions(self: ModuleInstance): void {
 	self.setActionDefinitions(definitions as Parameters<typeof self.setActionDefinitions>[0])
 }
 
-/** Preset slots the receiver offers, per settings.xml: 1-16. */
+/**
+ * Preset slots the receiver offers, per settings.xml: 1-16.
+ *
+ * Starts at 0, which is not a slot. A number field cannot carry the
+ * `— pick one —` the dropdowns use, so it says the same thing with the one
+ * value that cannot be meant: a button dragged on and saved untouched then
+ * names no slot, and `presetSlot()` turns it away. The old default was `1`,
+ * which made an unfinished "Store preset" overwrite slot 1 on its first
+ * press — and storing cannot be undone.
+ *
+ * `min` has to be 0 too: with `clampValues` Companion would otherwise raise
+ * the 0 back to 1 before the callback ever sees it.
+ */
 function presetNumber() {
 	return {
 		type: 'number' as const,
 		id: 'preset' as const,
-		label: 'Preset',
-		default: 1,
-		min: 1,
+		label: 'Preset (1-16)',
+		default: 0,
+		min: 0,
 		max: 16,
 		step: 1,
 		clampValues: true,
@@ -421,6 +470,12 @@ async function selectPresetSlot(self: ModuleInstance, raw: unknown): Promise<boo
 
 function presetSlot(self: ModuleInstance, raw: unknown): string | undefined {
 	const n = Math.round(Number(raw))
+	if (n === 0) {
+		// Its own line: "the receiver has slots 1-16" is true but blames the
+		// device for a button nobody finished.
+		self.log('warn', 'Ignoring preset action: no slot chosen on this button yet')
+		return undefined
+	}
 	if (!Number.isFinite(n) || n < 1 || n > 16) {
 		self.log('warn', `Ignoring preset ${JSON.stringify(raw)}: the receiver has slots 1-16`)
 		return undefined

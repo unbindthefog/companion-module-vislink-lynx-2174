@@ -31,7 +31,7 @@ Liefert alle 248 aktuell belegten Parameter als flache `<name>`/`<value>`-Paare.
 ### Beispiel-Request
 
 ```bash
-curl -s http://10.81.5.131/data.xml
+curl -s http://198.18.0.1/data.xml
 ```
 
 ### Beispiel-Response (Auszug)
@@ -476,7 +476,7 @@ Diese beiden Felder entsprechen 1:1 den GUI-Seiten „DEMOD“ und „DECODER“
 > Dieser Abschnitt war zunächst nur aus dem JavaScript der Web-GUI
 > (`common/webgui.js`, `common/custom.js`) rekonstruiert. **Am 20.10.2026 am
 > Laborgerät verifiziert** — Vislink Lynx L2174, Web-ID „Rx Relais",
-> Seriennummer 0324605, Build V1039 / SW 3.04, `10.81.5.149`, nur Strom und
+> Seriennummer 0324605, Build V1039 / SW 3.04, nur Strom und
 > Direktverbindung, nichts weiter angeschlossen.
 >
 > Das Protokoll funktioniert wie beschrieben: `GET` auf `iframe.php` mit
@@ -516,7 +516,7 @@ Beispiel (Combo-Box „Mode“ im Demodulator-Tab, **nicht ausgeführt**):
 
 ```bash
 # NICHT AUSFÜHREN — nur zur Dokumentation des Patterns
-# curl -s "http://10.81.5.131/common/iframe.php?param=DB_DEMOD_MOD_TYPE&value=64QAM"
+# curl -s "http://198.18.0.1/common/iframe.php?param=DB_DEMOD_MOD_TYPE&value=64QAM"
 ```
 
 Zwei clientseitige Schutzmechanismen in `custom.js`, die ein eigenes Schreib-Tool nachbilden müsste:
@@ -562,7 +562,7 @@ Direkte 1:1-Abbildung: jeder Parameter aus `data.xml` → eine Companion-Variabl
 ### Use Case 3: Multi-Antennen-Signalvergleich
 
 ```bash
-curl -s http://10.81.5.131/data.xml
+curl -s http://198.18.0.1/data.xml
 # Felder DB_DEMOD_PWR_LEVEL_1..4 und DB_DEMOD_MER_1..4 extrahieren
 # → Pegel/MER je der 4 Empfangsantennen für Diversity-Auswertung
 ```
@@ -625,14 +625,14 @@ Bemerkenswert: **L2174 ist die einzige der drei Plattformen mit eingebauter Selb
 
 - Hersteller: Vislink (ehemals Advent, davor teils IMT) — L2174 ist Teil der „Lynx“-Empfängerfamilie.
 - Herstellerbezeichnung im Web-UI: `<title>L2174</title>`, `<h1>L2174</h1>`, `<h2>LYNX RECEIVER</h2>`.
-- Alle Angaben in diesem Dokument wurden **read-only** per `GET` gegen ein produktives Gerät (`10.81.5.131`) ermittelt: `/data.xml`, `/settings.xml`, `/common/webgui.js`, `/common/custom.js`, sowie alle 14 `/common/<seite>.html`-Dateien der GUI-Navigation.
+- Alle Angaben in diesem Dokument wurden **read-only** per `GET` gegen ein produktives Gerät ermittelt: `/data.xml`, `/settings.xml`, `/common/webgui.js`, `/common/custom.js`, sowie alle 14 `/common/<seite>.html`-Dateien der GUI-Navigation.
 - Verwandte Recherche zu zwei weiteren Domo/Vislink-Plattformen (`SAPPHIRE_RXD4_API.md`, `NANO_HEVC_TX_API.md`) liegt im Schwesterprojekt [`domo-temperature-monitor`](https://github.com/unbindthefog/domo-temperature-monitor)/`apidoc/` — der Vergleichsabschnitt oben fasst die Unterschiede zusammen.
 
 ---
 
 **Dokument-Version**: 1.0
 **Erstellungsdatum**: 2026-09-04
-**Gerät**: Vislink Lynx L2174 (IP: 10.81.5.131, Web-ID „K7“)
+**Gerät**: Vislink Lynx L2174 (Web-ID „K7“)
 **Firmware**: Unit Build V1039, Unit Sw Version 3.04, Kernel 1.05
 **Status**: Read-only untersucht & dokumentiert — **kein Schreibzugriff getestet** (Produktivgerät)
 
@@ -645,8 +645,8 @@ einem Blick auf einen Teil der GUI-Seiten und ist zu klein.
 
 Maßgeblich ist, welche Felder die GUI über `send_form(this, …)` bzw.
 `send_form_combo(this, …)` setzen — jedes solche Formular schreibt per
-`iframe.php`. Über alle 41 Seiten des Geräts ausgezählt (Laborgerät
-`10.81.5.149`, V1039, 20.10.2026):
+`iframe.php`. Über alle 41 Seiten des Geräts ausgezählt (Laborgerät,
+V1039, 20.10.2026):
 
 ```bash
 # read-only: Seiten holen, Set-Formulare auszählen

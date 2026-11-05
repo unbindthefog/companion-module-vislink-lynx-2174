@@ -106,24 +106,33 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
  * exists. `api.ts` refuses the write as well, because a connection can be
  * switched to read-only while a button somewhere still carries an action.
  *
- * `config` is undefined before the first `configUpdated`, and an absent
- * `readOnly` means writes are allowed. That is *not* the field's default —
- * the default is `true`, and Companion writes it into the stored config the
- * first time a connection starts. Absent therefore means one thing only: a
- * connection saved before this switch existed. Those were writing before and
- * keep writing; changing the default must not reach back and silence them.
+ * Only a stored `false` writes. Everything else locks, the absent key
+ * included — and that last part is the one worth spelling out, because the
+ * sister modules answer it differently and for good reason.
+ *
+ * An absent key means a connection older than this switch. What such a
+ * connection could do before depends on the module: where writing already
+ * existed, taking it away would be a regression, so there the absent key
+ * keeps writing. Here it never existed. `v0.1.1` shipped
+ * `setActionDefinitions({})` with the comment "No actions yet — this module
+ * is deliberately read-only", and `config.ts` had no `readOnly` field at all.
+ * A connection from that version could not write if it wanted to, so locking
+ * it takes nothing away — while unlocking it would hand a live receiver a
+ * full set of actions on an upgrade nobody treated as a change.
  */
 export function writesAllowed(self: { config?: ModuleConfig }): boolean {
-	// Any truthy value locks, not only an exact `true`. An imported or
-	// hand-edited `.companionconfig` can carry `1` or `"yes"`, which the dialog
-	// renders as a ticked box, and a safety switch has to fail towards the lock
-	// for anything it does not recognise.
+	// Only an explicit `false` writes. Everything else locks, because
+	// everything else is a value nobody chose: an imported or hand-edited
+	// `.companionconfig` can carry `1` or `"yes"`, which the dialog renders as
+	// a ticked box, and it can just as well carry `null`, `0` or `""` after a
+	// trip through a serialiser. A falsy accident is no more consent than a
+	// truthy one, and a safety switch has to fail towards the lock for
+	// anything it does not recognise.
 	//
-	// `undefined` is the one exception, and deliberate: it cannot come from a
-	// new connection — Companion saves the default on first start — only from
-	// one older than the switch. Tightening this to `=== false` would lock
-	// those silently, which is the opposite of what the default change is for.
-	return !self.config?.readOnly
+	// The missing key locks as well — see the note above for why that is right
+	// here and wrong in a module that could already write.
+	const value = self.config?.readOnly
+	return value === false
 }
 
 /**
