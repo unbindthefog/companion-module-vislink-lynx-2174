@@ -392,10 +392,10 @@ export function UpdatePresets(self: ModuleInstance): void {
 		groups[setting.section].push({ id: `set_${setting.id}`, type: 'simple', name: setting.label, presets: ids })
 	}
 
-	// Every control preset carries an action, and under read-only there are no
-	// actions — so the monitoring sections stay and the Control ones do not
-	// appear at all, rather than handing out buttons that land as "unknown
-	// action".
+	// Control presets stay out under read-only. The actions themselves remain
+	// on offer — a press is refused and logged — but handing someone a page of
+	// ready-made buttons that all decline is a different thing from leaving the
+	// actions available to whoever goes looking for them.
 	const writes = writesAllowed(self)
 	const guardedOn = guardedActionsEnabled(self)
 	for (const setting of writes ? CONTROL_SETTINGS : []) {

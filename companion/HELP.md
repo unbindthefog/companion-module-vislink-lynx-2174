@@ -5,13 +5,15 @@ Monitors a Vislink Lynx L2174 RF broadcast receiver through its built-in
 and feedbacks.
 
 **Read only, and on by default.** A switch per connection turns the module into
-a pure monitor: variables and feedbacks keep working, and there are no actions
-at all — nothing to place on a button by mistake, and a button that already
-carries one cannot reach the receiver either, because the refusal also sits in
-the client. The connection list shows `Read only` while it is on. A new
-connection starts this way on purpose: the first poll may well land on a
-receiver that is on air, and clearing the switch is how you say you mean to
-control this one.
+a pure monitor: variables and feedbacks keep working, and nothing is ever
+written. The actions stay in the list — pressing one does nothing and says in
+the log that the connection is read only, which is also what happens to a
+button you built before setting the switch. The four interrupting actions are
+the exception: they follow their own switch, which read only turns off with
+it, so a button carrying one of those reports a missing action instead. The connection list shows
+`Read only` while it is on. A new connection starts this way on purpose: the
+first poll may well land on a receiver that is on air, and clearing the switch
+is how you say you mean to control this one.
 
 **What it may change**, once that switch is cleared. The module reads freely and writes only the 36
 parameters its actions need — reception, routing, video output and the status
@@ -28,13 +30,13 @@ than a list of things to avoid.
 
 ## Configuration
 
-| Field                | Notes                                                                                                       |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Receiver address     | IP address or hostname of the L2174.                                                                        |
-| Port                 | Normally `80`.                                                                                              |
-| Poll interval        | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second. |
-| Read only            | **On by default.** While on there are no actions, no control presets, and nothing is ever written.          |
-| Interrupting actions | Off by default, and hidden while read only is on. Preset recall and store, reboot and downconverter power.  |
+| Field                | Notes                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Receiver address     | IP address or hostname of the L2174.                                                                                |
+| Port                 | Normally `80`.                                                                                                      |
+| Poll interval        | How often status is fetched. `2` seconds is a good default; the receiver's own web UI polls every 1 second.         |
+| Read only            | **On by default.** While on, nothing is written: a press is refused and logged, and no control presets are offered. |
+| Interrupting actions | Off by default, and hidden while read only is on. Preset recall and store, reboot and downconverter power.          |
 
 There is nothing to configure about the transport — the receiver serves
 `data.xml` over plain HTTP with no authentication.

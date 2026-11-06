@@ -10,9 +10,10 @@ Notes on the receiver's (undocumented) API, gathered by exploring a live unit
 read-only, live in [`docs/LYNX_L2174_API.md`](docs/LYNX_L2174_API.md).
 
 > **A connection is read only until you say otherwise.** The switch is on by
-> default, and while it is on there are no actions at all — the list is empty, so
-> nothing can be placed, and a button saved earlier is refused in the client.
-> Once it is cleared:
+> default, and while it is on nothing is written — a press is refused in the
+> client and logged, whether the button was built before or after the switch
+> was set. The four interrupting actions are the exception: they follow their
+> own switch, which read only turns off with it. Once it is cleared:
 >
 > **Writes are a short allowlist, not a free hand.** Of the 88 parameters the
 > receiver's own web interface can set, the module changes 28 for its everyday

@@ -61,7 +61,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			width: 12,
 			label: 'Read only',
 			value:
-				'On by default, and a new connection starts as a monitor: variables and feedbacks keep working, and the receiver is never written to. There are no actions at all while it is on, so there is nothing to place on a button by mistake — and the refusal also sits in the client itself, so a button that already carries an action cannot reach the receiver either. Clear it deliberately, for a receiver you mean to control; leave it for one that is on air.',
+				'On by default, and a new connection starts as a monitor: variables and feedbacks keep working, and the receiver is never written to. The actions stay in the list — a press is refused and logged instead, which is also what happens to a button built before this was switched on. The four interrupting actions below are the exception: they follow their own switch, which this one turns off with it. Clear it deliberately, for a receiver you mean to control; leave it for one that is on air.',
 		},
 		{
 			type: 'checkbox',
@@ -119,7 +119,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
  * so no stranger owns such a connection — only the ones made on this bench
  * while it was being built. For those, the cost of locking is ticking a box
  * once; the cost of not locking is a receiver that may be on air silently
- * gaining a full action list on an upgrade nobody treated as a change.
+ * gaining the ability to write on an upgrade nobody treated as a change.
  *
  * The sister modules answer this the other way round, and are right to:
  * their connections have been writing for longer than ours, and the same

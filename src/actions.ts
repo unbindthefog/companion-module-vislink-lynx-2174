@@ -26,8 +26,11 @@ import {
  *
  * The interrupting ones — preset recall, preset store, reboot, and the four
  * downconverter supplies — are registered as `undefined` unless the
- * connection's switch is on, so they are absent from the list rather than
- * present and ignored. Restoring defaults, licence entry and key material are
+ * connection's interrupting-actions switch is on, so they are absent from the
+ * list rather than present and ignored. That switch asks "do I want to be
+ * able to hit these by accident", which is a different question from
+ * read-only's "does this connection write at all" — read-only leaves the list
+ * alone and refuses on the press. Restoring defaults, licence entry and key material are
  * refused in `api.ts` whatever the switch says: a reboot comes back, a wiped
  * configuration does not.
  */
@@ -72,7 +75,7 @@ export type ActionsSchema = {
 	set_status_pin_alarm_level: ChoiceOptions
 }
 
-type Write = (name: string, value: string, verify?: boolean) => Promise<boolean>
+type Write = (name: string, value: string, verify?: boolean, label?: string) => Promise<boolean>
 
 /**
  * 'Receive mode' -> 'receive mode', but 'ASI output source' is left alone.
@@ -103,6 +106,7 @@ function controlAction(
 	warn: (message: string) => void,
 	settings: () => Record<string, string | undefined>,
 	unconfirmed: (parameter: string) => boolean,
+	locked: () => boolean,
 ) {
 	const channelOption = {
 		type: 'dropdown' as const,
@@ -181,8 +185,14 @@ function controlAction(
 			// meant to touch.
 			// No row means the table lost it; warn as if the flag were on, which
 			// is the same direction every other unknown is treated in here.
+			// Suppressed on a locked connection, rather than returning here with
+			// a message of its own. The warning below describes DC arriving on
+			// antenna inputs, and on a locked connection none of it happens —
+			// warning about an effect that cannot occur teaches the reader to
+			// discount the warning. The refusal itself belongs to `write()`,
+			// which says it once, with the setting's label.
 			const flagPending = SET_ALL_SETTING === undefined || unconfirmed(SET_ALL_SETTING.parameter)
-			if (setting.widenedBySetAll && (flagPending || settings().set_all_channels !== 'No')) {
+			if (!locked() && setting.widenedBySetAll && (flagPending || settings().set_all_channels !== 'No')) {
 				const known = !flagPending && settings().set_all_channels === 'Yes'
 				const reached = CONTROL_CHANNELS.filter((n) => settings()[`channel_enable_${n}`] !== 'Off')
 				warn(
@@ -195,7 +205,7 @@ function controlAction(
 			// A row without a variable has nothing to read back. The two whose
 			// reading comes and goes with the pin mode do have one — `#poll()`
 			// knows to drop their check when they are out of view.
-			await write(controlParameter(setting, channel), value, Boolean(setting.variable))
+			await write(controlParameter(setting, channel), value, Boolean(setting.variable), setting.label)
 		},
 	}
 }
@@ -209,7 +219,22 @@ export function UpdateActions(self: ModuleInstance): void {
 	 * reached, not that it kept the value. Where that difference matters — the
 	 * two-step preset actions — use `selectPresetSlot()` below instead.
 	 */
-	const write = async (name: string, value: string, verify = true): Promise<boolean> => {
+	const write = async (name: string, value: string, verify = true, label?: string): Promise<boolean> => {
+		// Said here as well as in the client, and said differently: a locked
+		// connection refusing a press is the switch working, not a fault. The
+		// client's own refusal still stands behind this one — it is the check
+		// that counts, because it runs as the request leaves the queue — but on
+		// this path it would read as "Could not set X: Refusing to write X",
+		// which sounds like something went wrong.
+		//
+		// Named by its label where there is one. Every other refusal on this
+		// path says "Video input mode"; saying `DB_L2174_VIDEO_INPUT_MODE` for
+		// the same button would be the one line in the log written for the
+		// machine rather than for whoever pressed it.
+		if (!writesAllowed(self)) {
+			self.log('warn', `Not setting ${label ?? name}: this connection is read only`)
+			return false
+		}
 		try {
 			await self.writeParameter(name, value, verify)
 			return true
@@ -239,6 +264,7 @@ export function UpdateActions(self: ModuleInstance): void {
 						warn,
 						() => self.state.settings,
 						(parameter) => self.isUnconfirmed(parameter),
+						() => !writesAllowed(self),
 					)
 	}
 
@@ -346,25 +372,21 @@ export function UpdateActions(self: ModuleInstance): void {
 					description:
 						'Restarts the receiver. Measured on the bench: it answers again after about 20 seconds, and reports the configuration it had. How long until it decodes a signal again was not measured — there was none to decode.',
 					options: [],
-					callback: async () => void (await write('DB_L2174_REBOOT', 'Yes', false)),
+					callback: async () => void (await write('DB_L2174_REBOOT', 'Yes', false, 'Reboot receiver')),
 				}
 			: undefined,
 	}
 
 	Object.assign(definitions, handwritten)
 
-	// Read-only empties the list rather than leaving actions that refuse: an
-	// action nobody can place is the honest form of "this connection does not
-	// write", while one that sits in the list and fails on the press is not.
-	//
-	// Blanked here rather than skipped above, so that what disappears is exactly
-	// what would otherwise have appeared. The SDK removes an action by being
-	// handed `undefined` for its id, not by the id being absent, and a second
-	// list of ids to keep in step would be one more thing to forget.
-	if (!writesAllowed(self)) {
-		for (const actionId of Object.keys(definitions)) definitions[actionId] = undefined
-	}
-
+	// Read-only leaves the list alone. Emptying it was the first design and it
+	// was wrong in the way that only a person at the machine finds out: a
+	// module with no actions looks broken, and a button built before the switch
+	// was set reports `Failed to find action definition for …` on the press —
+	// a defect report, where the truth is "this connection is locked". The
+	// outer gate stopped the inner one from being understood, and it protected
+	// nothing: `api.ts` refuses every write as it leaves the queue, including
+	// from exactly those older buttons.
 	self.setActionDefinitions(definitions as Parameters<typeof self.setActionDefinitions>[0])
 }
 
@@ -418,6 +440,15 @@ const presetBusy = new WeakMap<ModuleInstance, boolean>()
  * indistinguishable from one that failed.
  */
 async function withPresetSlot(self: ModuleInstance, raw: unknown, trigger: () => Promise<void>): Promise<void> {
+	// This pair goes through `writeAndConfirm`, not through `write()`, so it
+	// needs the same courtesy: without it a locked connection answers a press
+	// with "Could not select preset 001: Refusing to write …" at error level —
+	// the defect report this whole change is about, left standing in the one
+	// place that took a different route.
+	if (!writesAllowed(self)) {
+		self.log('warn', 'Not recalling or storing a preset: this connection is read only')
+		return
+	}
 	if (presetBusy.get(self)) {
 		self.log(
 			'warn',

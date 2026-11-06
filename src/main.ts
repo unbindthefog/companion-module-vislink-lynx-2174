@@ -222,8 +222,9 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
-		// The action list depends on two switches — read-only and the interrupting
-		// actions — so it has to be rebuilt rather than only reconnected.
+		// The action list depends on the interrupting-actions switch, so it has
+		// to be rebuilt rather than only reconnected. Read-only no longer
+		// changes it — it changes what a press does.
 		this.updateActions()
 		// And the presets that hand them out, so the two lists never disagree about
 		// which actions exist. Buttons that already carry a removed action are a

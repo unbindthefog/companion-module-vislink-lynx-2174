@@ -316,7 +316,7 @@ describe('the write switch only opens for an explicit no', () => {
 		// before the switch did. Locking it takes that away on purpose: the
 		// module was never in the store, so the only connections affected are
 		// the ones made on this bench, and ticking a box once is cheaper than
-		// a live receiver quietly gaining an action list on an upgrade.
+		// a live receiver quietly gaining the ability to write on an upgrade.
 		assert.equal(writes(undefined), false)
 		assert.equal(writesAllowed({}), false, 'and before the first configUpdated')
 	})
@@ -564,7 +564,7 @@ describe('the two-step preset actions', () => {
 	})
 })
 
-describe('the two switches decide what exists', () => {
+describe('the interrupting-actions switch decides what exists', () => {
 	const guardedIds = ['recall_preset', 'store_preset', 'reboot_receiver', 'set_lnb_power']
 
 	it('guarded actions are absent while the switch is off', () => {
@@ -578,14 +578,84 @@ describe('the two switches decide what exists', () => {
 		for (const id of guardedIds) assert.ok(defs[id], `${id} should be offered`)
 	})
 
-	it('read only leaves no action at all, and names every id it removes', () => {
-		// Compared against the list the same build produces with writes allowed:
-		// the SDK removes an action by being handed `undefined` for its id, so an
-		// id that is simply missing here would stay on offer.
-		const offered = Object.keys(definitionsFor({ allowGuardedActions: true }).defs)
-		const { defs } = definitionsFor({ readOnly: true, allowGuardedActions: true })
+	it('read only leaves the list alone — the same actions, refused on the press', () => {
+		// The opposite of what this test used to assert, and the reason is in
+		// `src/actions.ts`: an empty list makes a working module look broken,
+		// and a button built before the switch was set reports "Failed to find
+		// action definition" instead of saying the connection is locked.
+		const unlocked = definitionsFor({ readOnly: false, allowGuardedActions: false }).defs
+		const { defs } = definitionsFor({ readOnly: true, allowGuardedActions: false })
 
-		assert.deepEqual(new Set(Object.keys(defs)), new Set(offered), 'every id has to be named to be removed')
-		for (const id of Object.keys(defs)) assert.equal(defs[id], undefined, `${id} should be removed under read only`)
+		assert.deepEqual(
+			Object.keys(defs).filter((id) => defs[id]),
+			Object.keys(unlocked).filter((id) => unlocked[id]),
+			'the same actions are on offer either way',
+		)
+		assert.ok(Object.keys(defs).filter((id) => defs[id]).length > 0, 'and there are some')
+	})
+
+	it('refuses a preset press on its own route, and says the same thing', async () => {
+		// `selectPresetSlot` goes through `writeAndConfirm`, not through
+		// `write()`, so it needs its own check — without one a locked
+		// connection answered with "Could not select preset 001: Refusing to
+		// write …" at error level, the defect report this change is about.
+		const self = stubInstance({ readOnly: true, allowGuardedActions: true })
+		UpdateActions(self)
+		// Read-only also hides the guarded actions today, so the press has to
+		// be made the way a button built before the switch makes it: through
+		// the definition captured while the connection was still unlocked.
+		const unlocked = stubInstance({ readOnly: false, allowGuardedActions: true })
+		UpdateActions(unlocked)
+		const callback = unlocked.definitions.store_preset.callback
+		unlocked.config.readOnly = true
+		await callback({ options: { preset: 3 } })
+
+		assert.deepEqual(unlocked.writes, [], 'nothing may reach the receiver')
+		const said = unlocked.logs.find((l) => l.message.includes('read only'))
+		assert.ok(said, 'and it has to say why')
+		assert.doesNotMatch(said.message, /Could not/, 'without sounding like a fault')
+	})
+
+	it('does not warn about an effect a locked connection cannot have', async () => {
+		// The one thing `locked()` is for. Without it the downconverter press
+		// warns about DC reaching every enabled antenna input — on a
+		// connection where no DC flows at all. A warning about something that
+		// cannot happen teaches the reader to discount warnings.
+		const unlocked = stubInstance(
+			{ readOnly: false, allowGuardedActions: true },
+			{ set_all_channels: 'Yes', channel_enable_1: 'On' },
+		)
+		UpdateActions(unlocked)
+		const callback = unlocked.definitions.set_lnb_power.callback
+		unlocked.config.readOnly = true
+		await callback({ options: { channel: '1', value: 'On' } })
+
+		assert.deepEqual(unlocked.writes, [])
+		assert.equal(unlocked.logs.length, 1, 'one line, not two')
+		assert.match(unlocked.logs[0].message, /read only/)
+		assert.doesNotMatch(unlocked.logs[0].message, /apply to all/)
+	})
+
+	it('names the setting rather than the device parameter when it refuses', async () => {
+		const unlocked = stubInstance({ readOnly: false })
+		UpdateActions(unlocked)
+		const callback = unlocked.definitions.set_video_input_mode.callback
+		unlocked.config.readOnly = true
+		await callback({ options: { value: 'H264' } })
+
+		const said = unlocked.logs.find((l) => l.message.includes('read only'))
+		assert.match(said.message, /Video input mode/, 'the label is what the operator sees on the button')
+		assert.doesNotMatch(said.message, /DB_/, 'the device id is not something they can look up')
+	})
+
+	it('refuses the press itself, and says the connection is locked rather than faulty', async () => {
+		const self = stubInstance({ readOnly: true })
+		UpdateActions(self)
+		await self.definitions.set_rx_mode.callback({ options: { mode: 'DVBT' } })
+
+		assert.deepEqual(self.writes, [], 'nothing may reach the receiver')
+		const said = self.logs.find((l) => l.message.includes('read only'))
+		assert.ok(said, 'and the press has to say why it did nothing')
+		assert.doesNotMatch(said.message, /Could not set/, 'which is not the same as something going wrong')
 	})
 })

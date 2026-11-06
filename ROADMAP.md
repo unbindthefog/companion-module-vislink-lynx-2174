@@ -109,8 +109,9 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       has an action but no ready-made button on purpose: it is a mode that
       changes what _other_ buttons reach, and none of those buttons could show
       it. Preset recall, preset store and
-      reboot are absent from the action list until the switch is on, rather
-      than present and ignored; `DB_RESTORE_DEFAULTS`, licence entry and key
+      reboot are absent from the action list until the interrupting-actions
+      switch is on — that switch is about not hitting them by accident, which
+      is a different question from whether this connection writes at all; `DB_RESTORE_DEFAULTS`, licence entry and key
       material stay refused outright
 - [x] Verify on the lab unit (2026-10-20): the first six
       actions, preset recall end to end (30 parameters changed, the receiver
@@ -165,10 +166,15 @@ by the same check that refuses any value the receiver does not offer, with a
 line that names the button rather than blaming the device. Ready-made presets
 were never affected — they carry their value explicitly.
 
-Read only (2026-10-22): a per-connection switch that empties the action list,
-drops the control presets and refuses the write in `src/api.ts` as well — the
-last of those at the moment the request leaves the queue, not when the action is
-called, which also retires the finding carried since `db46ba7`. **On by
+Read only (2026-10-22): a per-connection switch that drops the control presets
+and refuses the write in `src/api.ts` — at the moment the request leaves the
+queue, not when the action is called, which also retires the finding carried
+since `db46ba7`. It used to empty the action list as well; that was removed on
+2026-11-06 after a hand test on a sister module showed what it costs. A module
+with no actions looks broken, and a button built before the switch was set
+reports `Failed to find action definition` on the press — a defect report
+where the truth is "this connection is locked". It protected nothing either:
+the client refuses every write, including from exactly those older buttons. **On by
 default since 2026-10-26**, before the first release rather than after: a
 default is free to choose until someone else's connections depend on it, and
 the wrong one here costs a write nobody intended, not a tick in a dialog.
@@ -180,7 +186,7 @@ connections _could_ write (the actions landed in `db46ba7`, the switch only in
 `32abc11`), so this takes something away on purpose: the module has never been
 in the store, so the only ones affected are the connections made on this
 bench, and ticking a box once is cheaper than a receiver that may be on air
-quietly gaining an action list on an upgrade. `src/upgrades.ts` stays empty
+quietly gaining the ability to write on an upgrade. `src/upgrades.ts` stays empty
 all the same — a changed default never gets a migration, and here there is
 nothing to migrate anyone to.
 
@@ -191,7 +197,7 @@ Still open on the control side:
       offers two values that collide under those rules, which
       `test/matching.test.js` asserts
 - [x] Test setup (2026-10-22): `yarn test` builds and runs `node --test test/`,
-      104 assertions in about half a minute, no device and no Companion — the
+      108 assertions in about half a minute, no device and no Companion — the
       write-path tests wait on real timers for outages and the spacing between
       held writes, which is where that time goes. It pins what
       each action writes — every row of the table, every value, all four
