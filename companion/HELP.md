@@ -167,8 +167,12 @@ connection is healthy.
   button.
 - **Video decoder is locked** — true while the decoder reports video lock.
 - **Frame lock (genlock) has failed** — red while the decoder reports a frame
-  lock error. Note the receiver reports `OK` while genlock is switched _off_,
-  so this only says something once genlock is set to `SD` or `HD`. The
+  lock error: nothing at the F/LOCK input, or a reference that does not suit
+  the mode genlock is set to. On the unit tested, SD blackburst locked the `SD`
+  setting and failed the `HD` one, and it locked with no input signal at all —
+  so this does not go red merely because the receiver is idle. Note the
+  receiver reports `OK` while genlock is switched _off_, so this only says
+  something once genlock is set to `SD` or `HD`. The
   ready-made button greys itself out in the `Off` case for that reason.
 - **Any alarm is active** — red while the receiver's alarm bitfield reports at
   least one active condition.

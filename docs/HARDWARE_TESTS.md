@@ -150,30 +150,40 @@ behoben und in `LYNX_L2174_API.md` festgehalten:
 ob ein angenommener Wert auch wirkt. Dafür braucht es Signal, Downconverter,
 Monitor oder Referenz.
 
-## 1. Downconverter-Speisung unter Last
+## 1. Downconverter-Speisung: beantwortet am 11.11.2026
 
-Das Einzige, was am Tischgerät nur halb beantwortet werden konnte. Der Write
-wird angenommen, aber ohne etwas am Koax sagt das Gerät nichts darüber, ob
-wirklich Spannung anliegt:
+Aufbau: Downconverter an RF1, an RF2–RF4 nichts. Gemessen an **einem** Gerät,
+in einer Sitzung.
 
-- `DB_DEMOD_CURRENT_1` blieb bei `017` — kein Strom, keine Last
-- `DB_L2174_ALARMS` Bit 10 (`LNB Fault`) blieb `0`
+| Zustand                       | RF1                       | RF2   | RF3   | RF4   |
+| ----------------------------- | ------------------------- | ----- | ----- | ----- |
+| Ausgang, alle Speisungen `On` | **238 mA**                | 59 mA | 42 mA | 59 mA |
+| `SET_ALL=Yes`, RF1 auf `Off`  | alle vier gehen auf `Off` |       |       |
+| → Strom nach 10 s             | **47 mA**                 | 56 mA | 39 mA | 55 mA |
+| `SET_ALL=No`, RF1 auf `Off`   | nur RF1 geht auf `Off`    |       |       |
+| → Strom nach 3 s              | **47 mA**                 | 57 mA | 39 mA | 56 mA |
 
-Offen ist damit, ob die beiden Werte **mit** Downconverter brauchbar sind:
+**Der Strom ist der erste Wirkungsnachweis des Moduls.** Bis hierher ließ sich
+nur zeigen, dass das Gerät einen geschriebenen Wert zurückliest. 238 mA → 47 mA
+zeigt, dass auch Spannung verschwindet.
 
-| Schritt                                    | Erwartung               | Notieren                     |
-| ------------------------------------------ | ----------------------- | ---------------------------- |
-| Downconverter an Eingang 1, Speisung `Off` | Strom nahe dem Leerwert | `DB_DEMOD_CURRENT_1`         |
-| Speisung auf `On`                          | Strom steigt messbar    | Wert und wie lange es dauert |
-| Speisung auf `Off`                         | Strom fällt zurück      | Wert                         |
+**Apply-to-all gilt auch unter Last.** Mit `DB_L2174_SET_ALL = Yes` schaltet ein
+Druck auf RF1 alle vier Kanäle, mit `No` nur RF1 — dasselbe Verhalten wie am
+22.10. am leeren Gerät, jetzt mit echtem Verbraucher.
 
-Wenn der Strom dabei einen brauchbaren Sprung macht, ist das die Grundlage für
-ein Feedback „Speisung läuft wirklich" statt nur „Speisung ist eingeschaltet" —
-und für eine Ampel, die einen Kurzschluss im Koax sichtbar macht, bevor jemand
-ihn sucht.
+Zwei Dinge, die man kennen sollte, bevor man die Stromanzeige für ein Feedback
+benutzt:
 
-**Nicht** absichtlich kurzschließen, um `LNB Fault` zu provozieren. Ob der Alarm
-dabei anspricht, lässt sich auch beobachten, falls es ohnehin passiert.
+- **„Aus" heißt nicht null.** Es bleiben 47 mA stehen, und die leeren Eingänge
+  zeigen 39–59 mA unabhängig vom Schaltzustand. Ein Feedback „Speisung läuft
+  wirklich" braucht also einen Bezugswert pro Kanal, keine feste Schwelle.
+- **Die Anzeige hinkt, und zwar unterschiedlich.** Mit `SET_ALL=No` war der
+  Strom nach 3 s unten, mit `Yes` nach 3 s noch nicht — erst nach 10 s. Das
+  Verteilen auf vier Kanäle dauert länger. Für das Verify-Fenster (mindestens
+  25 s) unkritisch, aber wer hier misst, urteilt nicht nach drei Sekunden.
+
+`LNB Fault` (Alarmbit 10) blieb in jedem Zustand `0`. Ein Kurzschluss wurde
+**nicht** provoziert; ob der Alarm anspricht, ist weiterhin offen.
 
 ## 2. Was echtes Signal braucht
 
@@ -209,18 +219,52 @@ Monitor an Ausgang 1 und 2, am besten mit Bild.
 | `set_overlay_background` | `Off` … `100`                                  | Sichtbarer Unterschied zwischen den Stufen                  |
 | `set_overlay_colour`     | `White` `Green`                                | —                                                           |
 
-## 4. Was eine Referenz braucht
+## 4. Referenz: beantwortet am 11.11.2026
 
-| Action        | Werte           | Worauf achten                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `set_genlock` | `Off` `SD` `HD` | **Für einen Fall beantwortet am 26.10.**: mit Genlock auf `SD` und **nichts** am Referenzeingang springt `DB_DECOD_GEN_LOCK_ERROR` von `OK` auf `Fail`, und das Preset „Frame lock (genlock)" wird in Companion **rot** — der rote Zweig von `genlock_failed` ist damit erstmals an echter Hardware gesehen. Nicht gemessen: `HD` ohne Referenz, und eine _falsche_ Referenz (SD-Signal bei `HD`); für Letzteres fehlt eine Quelle. |
+Aufbau: AJA Gen10 am F/LOCK-Eingang, Receiver **ohne** Signal
+(`DB_DECOD_VIDEO_LOCKED` = `No Lock`), Decoder-Ausgangsnorm
+`DB_DECOD_LINE_STD` = `1080I/50`.
 
-Frame Lock ist genau die Art Fehler, die man im Bild erst bemerkt, wenn es zu
-spät ist. Das Feedback gab es, bevor es am Gerät gesehen wurde; seit dem 26.10.
-ist es für `SD` ohne Referenz bestätigt. Die Stapelreihenfolge im Preset (grau gewinnt über rot, wenn
-Genlock `Off` ist) ruht weiter auf der ungeprüften Annahme, dass das Gerät bei
-`Off` nie `Fail` meldet — bei `Off` stand `GEN_LOCK_ERROR` an diesem Tag
-durchgehend auf `OK`, was die Annahme stützt, ohne sie zu beweisen.
+| Referenz am F/LOCK       | Genlock `Off` | `SD`                  | `HD`   |
+| ------------------------ | ------------- | --------------------- | ------ |
+| **SD Blackburst, 50 Hz** | `OK`          | **`OK` — rastet ein** | `Fail` |
+| HD Tri-Level, 1080/50    | `OK`          | `Fail`                | `Fail` |
+| kein Kabel               | `OK`          | `Fail`                | `Fail` |
+
+**Das Feedback `genlock_failed` ist damit in beide Richtungen bestätigt**: grün
+bei passender Referenz, rot bei fehlender _und_ bei unpassender. Es prüft nicht
+nur, ob etwas anliegt, sondern ob es zur eingestellten Betriebsart passt — `HD`
+mit SD-Blackburst meldet korrekt `Fail`.
+
+Drei Dinge, die dabei anders lagen als vermutet:
+
+- **Genlock braucht kein Video.** Der Receiver rastete ohne jedes Eingangssignal
+  ein. Für den Leerlauf ist die Sorge damit ausgeräumt, `Fail` sei dort der
+  Normalzustand. Wie sich Genlock **mit** anliegendem Video verhält, ist nicht
+  gemessen — siehe Abschnitt 2.
+- **Dieser Decoder will SD-Blackburst**, obwohl er selbst 1080i/50 ausgibt. Die
+  HD-Tri-Level-Referenz hat er nicht angenommen. Wer `set_genlock` auf `HD`
+  stellt, braucht also mehr als eine HD-Ausgangsnorm — ungeklärt ist, welche
+  Referenz `HD` erwartet.
+- **Die ersten drei Messreihen waren wertlos**, weil das Referenzkabel abgezogen
+  war. Sie sahen untereinander völlig stimmig aus und schienen eine
+  Geräteeigenschaft zu belegen. Gleiche Ergebnisse aus verschiedenen Gründen
+  sind von innen nicht unterscheidbar — wer hier nachmisst, prüft zuerst den
+  Steckerkontakt.
+
+**Das Gerät nennt den Zustand selbst beim Namen**: Alarmbit 20,
+`Frame not Locked`, geht mit `GEN_LOCK_ERROR` auf `Fail` mit und wieder weg.
+Das Modul bildet das Bit bereits ab, also schlagen `alarm_active` und
+`alarm_summary` mit an — der Alarmknopf wird rot, nicht nur der Genlock-Knopf.
+Das ist richtig so, solange das Gerät es als Störung führt.
+
+**Die Stapelreihenfolge im Preset** (grau gewinnt über rot, wenn Genlock `Off`
+ist) ruht auf sechs Messungen an einem Gerät: In allen sechs Durchgängen stand
+`GEN_LOCK_ERROR` bei `Off` auf `OK`, nie auf `Fail`. Das stützt die Reihenfolge,
+beweist sie aber nicht.
+
+Offen bleiben zwei Fragen: welche Referenzart `set_genlock` auf `HD` erwartet,
+und wie sich das Ganze mit anliegendem Video verhält.
 
 ## 5. Offen seit dem 22.10.: angenommen heißt nicht wirksam
 
@@ -309,8 +353,10 @@ ohnehin zu spät sind.
 Kein Vorgriff, nur die Stellen, an denen ein Testergebnis etwas am Modul ändern
 würde:
 
-- Strom unter Last brauchbar → Feedback und Ampel für die Speisung
-- `genlock_error` reagiert auch bei `HD` und bei _falscher_ Referenz → das Feedback ist über den einen gemessenen Fall hinaus belegt (für `SD` ohne Referenz ist es das seit 26.10.)
+- `set_genlock` auf `HD` mit passender Referenz → die Werteliste behält `HD`
+  mit Beleg statt mit Vermutung (am 11.11. nahm das Gerät HD-Tri-Level nicht an)
+- Genlock mit anliegendem Video → bestätigt, dass die Messung vom 11.11. nicht
+  nur für den Leerlauf gilt
 - Gerät lehnt Werte sichtbar ab → die Wertelisten könnten doch aus `settings.xml`
   je Verbindung geholt werden, statt die vollen Mengen zu führen (steht als
   offener Punkt in `ROADMAP.md`)

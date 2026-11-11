@@ -56,10 +56,12 @@ once the basics are proven:
   RXD4's `genlock` module (no reference format, no per-output buffer delays):
   `DB_DECOD_GEN_LOCK` (`Off`/`SD`/`HD`, the setting), `DB_DECOD_GEN_LOCK_ERROR`
   (`OK`/`Fail`, the state worth alarming on), `DB_DECOD_PCR_LOCK`,
-  `DB_DECOD_LINE_OFFSET` (pixel offset) and `DB_DECOD_PSF_MODE`. Deferred to
-  the lab setup on purpose: on the production unit, PCR lock read `No Lock`
-  while frame lock reported `OK` on the `SD` reference, so the interplay
-  between the two needs a unit we can reconfigure before mapping it.
+  `DB_DECOD_LINE_OFFSET` (pixel offset) and `DB_DECOD_PSF_MODE`. Partly
+  answered on 2026-11-11 with a generator on the F/LOCK input — frame lock
+  locks on a matching reference and fails on a missing or unsuitable one, and
+  it does so with no input signal at all. Still deferred: the interplay with
+  PCR lock, which read `No Lock` while frame lock reported `OK`, and what
+  reference the `HD` setting wants. See `docs/HARDWARE_TESTS.md` §4.
 
 Open questions:
 
@@ -136,8 +138,9 @@ GET /common/iframe.php?param=<NAME>&value=<VALUE>
       the HTTP API; `data.xml` compared before and after each press, and the
       unit put back to its starting state afterwards. Three things fell out of
       it: `genlock_failed`'s red branch was seen for the first time (with
-      genlock on `SD` and nothing on the reference input — `HD` was not
-      tried), the status pin's alarm level needs more than 4 s to read back,
+      genlock on `SD` and nothing on the reference input — `HD` was not tried
+      until 2026-11-11, see `docs/HARDWARE_TESTS.md` §4), the status pin's
+      alarm level needs more than 4 s to read back,
       and a long run of writes lost some of them. The explanation first drawn
       from that — a device-wide 1.5 s limit — was measured again on 2026-10-26
       and is **wrong**: short runs survive 0.2 s. See

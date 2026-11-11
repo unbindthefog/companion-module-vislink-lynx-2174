@@ -193,7 +193,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			name: 'Frame lock (genlock) has failed',
 			type: 'boolean',
 			description:
-				'Red while the decoder reports a frame lock error. It reports OK while frame lock is switched off, so this only says something once genlock is set to SD or HD — which is the point: a reference that goes away is the kind of fault you otherwise notice in the picture, too late.',
+				'Red while the decoder reports a frame lock error: no reference at the F/LOCK input, or one that does not suit the mode genlock is set to. Measured on one receiver with one generator — SD blackburst locked the SD setting and failed the HD one, with no input signal present. It reports OK while frame lock is switched off, so this only says something once genlock is set to SD or HD, which is the point: a reference that goes away is the kind of fault you otherwise notice in the picture, too late.',
 			defaultStyle: ALARM_STYLE,
 			options: [],
 			callback: () => self.state.genlockError === 'Fail',

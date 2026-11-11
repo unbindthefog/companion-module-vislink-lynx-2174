@@ -246,20 +246,24 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// clipped it. The type takes a plain number for exactly this.
 		style: { ...OK_STYLE, text: `GENLOCK\n$(${SELF}:genlock)`, size: 28 },
 		feedbacks: [
-			{ feedbackId: 'genlock_failed', options: {}, style: ALARM_STYLE, headline: 'Reference lost' },
+			{ feedbackId: 'genlock_failed', options: {}, style: ALARM_STYLE, headline: 'No usable reference' },
 			// Grey while frame lock is switched off. The receiver reports OK in
 			// that state, and green there would claim health about something
 			// nobody asked for — the same mistake as a green reading with no
 			// contact behind it.
 			//
 			// Deliberately *after* the red one, so grey wins: a reference
-			// error on a switched-off genlock is nothing to alarm about. The
-			// red branch itself is confirmed — on 2026-10-26 the bench unit
-			// went to `Fail` the moment genlock was set to `SD` with nothing
-			// on the reference input. What stays unproven is the converse:
-			// that it never reports `Fail` while `Off`. It read `OK`
-			// throughout that day, which supports the order without settling
-			// it, so this is still the line to revisit if one ever shows up.
+			// error on a switched-off genlock is nothing to alarm about.
+			//
+			// Both branches are measured now (2026-11-11, a Gen10 on the
+			// F/LOCK input). Green with SD blackburst and genlock on `SD`;
+			// red with the reference unplugged, and red with genlock on `HD`
+			// against that same SD reference — it judges the kind, not just
+			// the presence. `Off` read `OK` in all six runs, including the
+			// three where nothing was connected — six measurements on one
+			// receiver, which supports the order without settling it. Worth knowing: it locks with no
+			// input signal at all, so this never goes red merely because the
+			// receiver is idle.
 			{
 				feedbackId: 'setting_is',
 				options: { setting: 'genlock', value: 'Off' },
